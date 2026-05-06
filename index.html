@@ -1,2 +1,90 @@
 
 <a href="./sims/quantum-pic.html">Quantum Picture</a>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Repository Tree</title>
+    <style>
+        /* Basic styling for the tree */
+        ul.tree, ul.tree ul { list-style-type: none; margin: 0; padding: 0; }
+        ul.tree ul { margin-left: 20px; border-left: 1px solid #ccc; padding-left: 10px; }
+        ul.tree li { margin: 5px 0; font-family: monospace; }
+        .dir { font-weight: bold; color: #0366d6; }
+        .file { color: #24292e; }
+    </style>
+</head>
+<body>
+
+    <h2>Project Structure</h2>
+    <div id="repo-tree">Loading...</div>
+
+    <script>
+        // Configuration: Replace with your actual GitHub username and repository name
+        const owner = 'YOUR_GITHUB_USERNAME';
+        const repo = 'YOUR_REPOSITORY_NAME';
+        const branch = 'main'; // or 'master'
+
+        async function fetchTree() {
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                renderTree(data.tree);
+            } catch (error) {
+                document.getElementById('repo-tree').innerText = 'Error loading repository data.';
+                console.error('Error:', error);
+            }
+        }
+
+        function renderTree(flatTree) {
+            const root = { name: repo, type: 'tree', children: {} };
+
+            // Parse flat paths into a nested object
+            flatTree.forEach(item => {
+                const parts = item.path.split('/');
+                let currentLevel = root;
+
+                parts.forEach((part, index) => {
+                    if (!currentLevel.children[part]) {
+                        currentLevel.children[part] = {
+                            name: part,
+                            type: index === parts.length - 1 ? item.type : 'tree',
+                            path: item.path,
+                            children: {}
+                        };
+                    }
+                    currentLevel = currentLevel.children[part];
+                });
+            });
+
+            // Recursive function to build HTML lists
+            function buildHTML(node) {
+                let html = `<ul class="tree">`;
+                for (const key in node.children) {
+                    const child = node.children[key];
+                    const icon = child.type === 'tree' ? '📁 ' : '📄 ';
+                    const cssClass = child.type === 'tree' ? 'dir' : 'file';
+                    
+                    html += `<li><span class="${cssClass}">${icon}${child.name}</span>`;
+                    
+                    if (child.type === 'tree' && Object.keys(child.children).length > 0) {
+                        html += buildHTML(child);
+                    }
+                    html += `</li>`;
+                }
+                html += `</ul>`;
+                return html;
+            }
+
+            document.getElementById('repo-tree').innerHTML = buildHTML(root);
+        }
+
+        fetchTree();
+    </script>
+</body>
+</html>

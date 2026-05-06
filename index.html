@@ -3,224 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantum Pictures Visualization</title>
+    <title>QUANTUM//MAIN > NEURAL_TREE</title>
     <style>
-        body {
-            font-family: sans-serif;
-            background-color: #f0f0f0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        /* Cyberpunk Color Palette & Variables */
+        :root {
+            --bg-color: #050508;
+            --line-color: #4a4a5a;
+            
+            --dir-color: #bd00ff;     /* Neon Purple for directories */
+            --dir-glow: rgba(189, 0, 255, 0.4);
+            
+            --file-color: #00f3ff;    /* Neon Cyan for files */
+            --file-glow: rgba(0, 243, 255, 0.4);
+            
+            --root-color: #ff0055;    /* Neon Pink/Red for root */
+            --root-glow: rgba(255, 0, 85, 0.4);
+
+            --text-color: #e0e0e0;
+            --font-stack: 'Courier New', Courier, monospace;
         }
-        .container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            margin: 0;
+            padding: 2em;
+            /* Subtle scanline background */
+            background-image: linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px);
+            background-size: 100% 4px;
+        }
+
+        h2 {
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--file-color);
+            text-shadow: 0 0 10px var(--file-glow);
+            margin-bottom: 2em;
             text-align: center;
         }
-        .control-group {
-            margin-bottom: 20px;
-            text-align: left;
+
+        /* Container for the diagram to allow horizontal scrolling */
+        #repo-tree {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            padding-bottom: 50px;
+            min-height: 600px;
         }
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .control-group select {
-            width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-        }
-        #canvas-wrapper {
-            width: 500px;
-            height: 500px;
-            border: 2px solid #333;
-            background-color: #fafafa;
+
+        /* --- CSS Tree Graph Logic --- */
+        .tree ul {
+            padding-top: 30px;
             position: relative;
+            display: flex;
+            justify-content: center;
+            transition: all 0.5s;
+            margin: 0;
+            padding-left: 0;
         }
-        #visualization-canvas {
-            width: 100%;
-            height: 100%;
+
+        .tree li {
+            float: left;
+            text-align: center;
+            list-style-type: none;
+            position: relative;
+            padding: 30px 10px 0 10px;
+            transition: all 0.5s;
         }
-        .hud {
+
+        /* Horizontal connection lines */
+        .tree li::before, .tree li::after {
+            content: '';
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(255,255,255,0.8);
-            padding: 10px;
-            border-radius: 6px;
-            text-align: right;
-            font-size: 0.9em;
+            top: 0;
+            right: 50%;
+            border-top: 2px solid var(--line-color);
+            width: 50%;
+            height: 30px;
+        }
+        .tree li::after {
+            right: auto;
+            left: 50%;
+            border-left: 2px solid var(--line-color);
+        }
+
+        /* Clean up lines for first/last/only children */
+        .tree li:only-child::after, .tree li:only-child::before {
+            display: none;
+        }
+        .tree li:only-child {
+            padding-top: 0;
+        }
+        .tree li:first-child::before, .tree li:last-child::after {
+            border: 0 none;
+        }
+        .tree li:last-child::before {
+            border-right: 2px solid var(--line-color);
+            border-radius: 0 5px 0 0;
+        }
+        .tree li:first-child::after {
+            border-radius: 5px 0 0 0;
+        }
+
+        /* Downward vertical lines from parents */
+        .tree ul ul::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            border-left: 2px solid var(--line-color);
+            width: 0;
+            height: 30px;
+            transform: translateX(-1px);
+        }
+
+        /* --- Node Aesthetics (The Cyberpunk Boxes) --- */
+        .node {
+            background-color: #0a0a0c;
+            border: 1px solid;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: inline-block;
+            position: relative;
+            font-size: 13px;
+            z-index: 2;
+            min-width: 100px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: 0.2s;
+        }
+
+        .node:hover {
+            transform: scale(1.05);
+            cursor: crosshair;
+        }
+
+        /* The small logic badge hovering over the node */
+        .badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #000;
+            padding: 2px 8px;
+            font-size: 10px;
+            font-weight: bold;
+            border: 1px solid;
+            border-radius: 3px;
+            letter-spacing: 1px;
+            z-index: 3;
+        }
+
+        /* Directory specific styling */
+        .node.dir {
+            border-color: var(--dir-color);
+            box-shadow: 0 0 12px var(--dir-glow);
+        }
+        .node.dir .badge {
+            border-color: var(--dir-color);
+            color: var(--dir-color);
+        }
+
+        /* File specific styling */
+        .node.file {
+            border-color: var(--file-color);
+            box-shadow: 0 0 12px var(--file-glow);
+        }
+        .node.file .badge {
+            border-color: var(--file-color);
+            color: var(--file-color);
+        }
+
+        /* Root specific styling */
+        .node.root-node {
+            border-color: var(--root-color);
+            box-shadow: 0 0 15px var(--root-glow);
+        }
+        .node.root-node .badge {
+            border-color: var(--root-color);
+            color: var(--root-color);
+        }
+
+        /* Status messages */
+        .status {
+            text-align: center;
+            color: var(--dir-color);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="control-group">
-            <label for="quantum-picture">Choose Quantum Picture:</label>
-            <select id="quantum-picture">
-                <option value="Schrodinger">Schrödinger (States Evolve)</option>
-                <option value="Heisenberg">Heisenberg (Operators Evolve)</option>
-                <option value="Interaction">Interaction (Dirac - Hybrid)</option>
-            </select>
-        </div>
-
-        <div id="canvas-wrapper">
-            <canvas id="visualization-canvas" width="500" height="500"></canvas>
-            <div class="hud" id="hud-display">
-                Picture: Schrödinger<br>
-                Ω_state: 1.0 rad/s<br>
-                Ω_obs: 0.0 rad/s
-            </div>
-        </div>
-    </div>
+    <h2>System Architecture: repo_link</h2>
+    <div id="repo-tree"><div class="status">INITIALIZING SECURE UPLINK...</div></div>
 
     <script>
-        const canvas = document.getElementById('visualization-canvas');
-        const ctx = canvas.getContext('2d');
-        const hudDisplay = document.getElementById('hud-display');
-        const pictureSelect = document.getElementById('quantum-picture');
+        // --- Configuration ---
+        const owner = 'noisyboy';
+        const repo = 'quantum-mechanics';
+        const branch = 'main';
 
-        // Simulation parameters
-        const cx = 250; // Center X
-        const cy = 250; // Center Y
-        const radius = 200;
-        const w0 = 0.8; // H_0 angular velocity (fast)
-        const v = 0.15; // V(t) perturbation velocity (slow)
-        const w_total = w0 + v; // Total angular velocity
-
-        let currentPicture = "Schrodinger";
-        let startTime = Date.now();
-
-        // Update parameters based on selection
-        pictureSelect.addEventListener('change', function() {
-            currentPicture = this.value;
-            startTime = Date.now(); // Reset time to sync phases
-        });
-
-        function draw() {
-            // Calculate elapsed time in seconds
-            const time = (Date.now() - startTime) / 1000;
-
-            // Clear canvas
-            ctx.fillStyle = '#fafafa';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Determine velocities based on the picture
-            let stateVel, obsVel, obsAngle;
-
-            switch (currentPicture) {
-                case "Schrodinger":
-                    stateVel = w_total;
-                    obsVel = 0;
-                    obsAngle = 0;
-                    break;
-                case "Heisenberg":
-                    stateVel = 0;
-                    obsVel = -w_total; // Operators rotate back
-                    obsAngle = time * obsVel;
-                    break;
-                case "Interaction":
-                    stateVel = v;      // State vector rotates slowly
-                    obsVel = -w0;     // Observable axes rotate back at w0
-                    obsAngle = time * obsVel;
-                    break;
+        async function fetchTree() {
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+            const treeContainer = document.getElementById('repo-tree');
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                renderGraphTree(data.tree);
+            } catch (error) {
+                treeContainer.innerHTML = '<div style="color:red; text-shadow: 0 0 10px red;">ERROR:// CONNECTION_TERMINATED</div>';
+                console.error('Error:', error);
             }
-
-            // Calculate state vector angle
-            const stateAngle = time * stateVel;
-
-            // Update the HUD
-            hudDisplay.innerHTML = `
-                Picture: ${currentPicture}<br>
-                Ω_state: ${stateVel.toFixed(2)} rad/s<br>
-                Ω_obs: ${obsVel.toFixed(2)} rad/s
-            `;
-
-            // --- Draw Observable Axes (X/Y) ---
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(obsAngle);
-
-            // X-axis
-            ctx.beginPath();
-            ctx.moveTo(-radius, 0);
-            ctx.lineTo(radius, 0);
-            ctx.strokeStyle = '#999';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            // Arrow head
-            ctx.beginPath();
-            ctx.moveTo(radius, 0);
-            ctx.lineTo(radius-10, -5);
-            ctx.lineTo(radius-10, 5);
-            ctx.closePath();
-            ctx.fillStyle = '#999';
-            ctx.fill();
-            // Label
-            ctx.fillStyle = '#333';
-            ctx.font = '16px monospace';
-            ctx.fillText("X", radius + 10, 5);
-
-            // Y-axis
-            ctx.beginPath();
-            ctx.moveTo(0, radius);
-            ctx.lineTo(0, -radius);
-            ctx.strokeStyle = '#999';
-            ctx.stroke();
-            // Arrow head
-            ctx.beginPath();
-            ctx.moveTo(0, -radius);
-            ctx.lineTo(-5, -radius+10);
-            ctx.lineTo(5, -radius+10);
-            ctx.closePath();
-            ctx.fill();
-            // Label
-            ctx.fillText("Y", -5, -radius - 15);
-
-            ctx.restore(); // Restore to center
-
-
-            // --- Draw State Vector (|ψ>) ---
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(-stateAngle); // Standard rotation
-
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(radius, 0);
-            ctx.strokeStyle = '#007bff'; // Blue
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // Draw vector head
-            ctx.beginPath();
-            ctx.moveTo(radius, 0);
-            ctx.lineTo(radius-15, -7);
-            ctx.lineTo(radius-15, 7);
-            ctx.closePath();
-            ctx.fillStyle = '#007bff';
-            ctx.fill();
-
-            // Add text label
-            ctx.fillStyle = '#007bff';
-            ctx.font = 'bold 20px serif';
-            ctx.fillText("|ψ⟩", radius + 15, 7);
-
-            ctx.restore();
-
-            requestAnimationFrame(draw);
         }
 
-        // Start animation loop
-        requestAnimationFrame(draw);
+        function renderGraphTree(flatTree) {
+            // Initialize Root
+            const root = { name: repo, type: 'tree', children: {} };
+
+            // Parse flat paths into nested object
+            flatTree.forEach(item => {
+                const parts = item.path.split('/');
+                let currentLevel = root;
+
+                parts.forEach((part, index) => {
+                    if (!currentLevel.children[part]) {
+                        currentLevel.children[part] = {
+                            name: part,
+                            type: index === parts.length - 1 ? item.type : 'tree',
+                            children: {}
+                        };
+                    }
+                    currentLevel = currentLevel.children[part];
+                });
+            });
+
+            // Recursive function to build the nested UL/LI structure
+            function buildHTML(node) {
+                let html = `<ul>`;
+                
+                // Sort to keep directories on the left, files on the right
+                const sortedKeys = Object.keys(node.children).sort((a, b) => {
+                    const typeA = node.children[a].type;
+                    const typeB = node.children[b].type;
+                    if (typeA === typeB) return a.localeCompare(b);
+                    return typeA === 'tree' ? -1 : 1;
+                });
+
+                sortedKeys.forEach(key => {
+                    const child = node.children[key];
+                    const isDir = child.type === 'tree';
+                    
+                    const cssClass = isDir ? 'node dir' : 'node file';
+                    const badgeText = isDir ? 'DIR' : 'FILE';
+                    
+                    html += `<li>`;
+                    html += `
+                        <div class="${cssClass}">
+                            <div class="badge">${badgeText}</div>
+                            ${child.name}
+                        </div>
+                    `;
+                    
+                    if (isDir && Object.keys(child.children).length > 0) {
+                        html += buildHTML(child);
+                    }
+                    html += `</li>`;
+                });
+                
+                html += `</ul>`;
+                return html;
+            }
+
+            // Build the final DOM structure starting with the Root node
+            let finalHtml = `
+                <div class="tree">
+                    <ul>
+                        <li>
+                            <div class="node root-node">
+                                <div class="badge">ROOT</div>
+                                ${root.name}
+                            </div>
+                            ${Object.keys(root.children).length > 0 ? buildHTML(root) : ''}
+                        </li>
+                    </ul>
+                </div>
+            `;
+
+            document.getElementById('repo-tree').innerHTML = finalHtml;
+        }
+
+        // Engage connection
+        fetchTree();
     </script>
 </body>
 </html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Pictures: Train Analogy</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: #313244;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+        canvas {
+            background: #11111b;
+            border-radius: 4px;
+            border: 1px solid #45475a;
+            margin-top: 20px;
+            width: 100%;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label { margin-bottom: 5px; font-weight: bold; }
+        input[type="range"], select { width: 100%; }
+        .buttons {
+            grid-column: span 2;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        button {
+            background: #89b4fa;
+            color: #11111b;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+        }
+        button:hover { background: #b4befe; }
+        .info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #45475a;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quantum Pictures Visualization</h2>
+    <p>Visualizing the Schrödinger, Interaction, and Heisenberg pictures using relative motion.</p>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="h0-speed">Train Speed (H₀): <span id="h0-val">100</span> px/s</label>
+            <input type="range" id="h0-speed" min="0" max="200" value="100">
+        </div>
+        <div class="control-group">
+            <label for="v-speed">Walk Speed (V): <span id="v-val">30</span> px/s</label>
+            <input type="range" id="v-speed" min="0" max="100" value="30">
+        </div>
+        <div class="control-group" style="grid-column: span 2;">
+            <label for="picture-select">Quantum Picture (Reference Frame):</label>
+            <select id="picture-select">
+                <option value="schrodinger">Schrödinger (Platform View - State moves via H₀+V)</option>
+                <option value="interaction">Interaction (Train View - State moves via V)</option>
+                <option value="heisenberg">Heisenberg (Passenger View - Operators move via H₀+V)</option>
+            </select>
+        </div>
+        <div class="buttons">
+            <button id="play-btn">Play / Pause</button>
+            <button id="reset-btn">Reset Time</button>
+        </div>
+    </div>
+
+    <div class="info" id="status-text">
+        <strong>Status:</strong> Paused at t=0s
+    </div>
+
+    <canvas id="simCanvas" width="800" height="300"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const h0Input = document.getElementById('h0-speed');
+    const vInput = document.getElementById('v-speed');
+    const h0Val = document.getElementById('h0-val');
+    const vVal = document.getElementById('v-val');
+    const picSelect = document.getElementById('picture-select');
+    const playBtn = document.getElementById('play-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const statusText = document.getElementById('status-text');
+
+    // State variables
+    let time = 0;
+    let lastTimestamp = 0;
+    let isPlaying = false;
+    let animationId;
+
+    // Constants for drawing
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const groundY = 220;
+
+    // Update UI numbers
+    h0Input.addEventListener('input', (e) => h0Val.textContent = e.target.value);
+    vInput.addEventListener('input', (e) => vVal.textContent = e.target.value);
+
+    // Controls
+    playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) {
+            lastTimestamp = performance.now();
+            loop(lastTimestamp);
+        } else {
+            cancelAnimationFrame(animationId);
+        }
+        updateStatus();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        time = 0;
+        draw(0);
+        updateStatus();
+    });
+
+    picSelect.addEventListener('change', () => {
+        time = 0; // Reset time on picture change for clarity
+        draw(0);
+        updateStatus();
+    });
+
+    function updateStatus() {
+        statusText.innerHTML = `<strong>Status:</strong> ${isPlaying ? 'Running' : 'Paused'} at t=${time.toFixed(2)}s | Frame: ${picSelect.options[picSelect.selectedIndex].text}`;
+    }
+
+    function drawScenery(offset) {
+        ctx.strokeStyle = '#585b70';
+        ctx.lineWidth = 4;
+        
+        // Draw ground line
+        ctx.beginPath();
+        ctx.moveTo(0, groundY);
+        ctx.lineTo(canvasWidth, groundY);
+        ctx.stroke();
+
+        // Draw passing poles (modulo math makes it infinite)
+        const spacing = 150;
+        const normalizedOffset = offset % spacing;
+        
+        for (let x = normalizedOffset - spacing; x < canvasWidth + spacing; x += spacing) {
+            ctx.beginPath();
+            ctx.moveTo(x, groundY);
+            ctx.lineTo(x, groundY - 60);
+            ctx.stroke();
+        }
+    }
+
+    function drawTrain(x) {
+        ctx.fillStyle = '#89b4fa';
+        // Train Body
+        ctx.fillRect(x - 100, groundY - 100, 200, 90);
+        
+        // Windows
+        ctx.fillStyle = '#1e1e2e';
+        ctx.fillRect(x - 80, groundY - 80, 40, 40);
+        ctx.fillRect(x - 10, groundY - 80, 40, 40);
+        ctx.fillRect(x + 60, groundY - 80, 20, 40);
+
+        // Wheels
+        ctx.fillStyle = '#cdd6f4';
+        ctx.beginPath();
+        ctx.arc(x - 60, groundY - 10, 10, 0, Math.PI * 2);
+        ctx.arc(x + 60, groundY - 10, 10, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawPassenger(x) {
+        ctx.fillStyle = '#f38ba8'; // Red dot for passenger state
+        ctx.beginPath();
+        ctx.arc(x, groundY - 50, 12, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw a small trail line indicating velocity vector
+        ctx.strokeStyle = '#f38ba8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, groundY - 50);
+        ctx.lineTo(x - 20, groundY - 50);
+        ctx.stroke();
+    }
+
+    function draw(dt) {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        const h0 = parseFloat(h0Input.value);
+        const v = parseFloat(vInput.value);
+        const picture = picSelect.value;
+
+        let bgOffset = 0;
+        let trainPos = canvasWidth / 2; // Center initially
+        let passPos = canvasWidth / 2;
+
+        // Apply physics based on the selected picture
+        if (picture === 'schrodinger') {
+            // Platform View: Background fixed. Train moves H0. Passenger moves H0+V.
+            bgOffset = 0;
+            trainPos = (canvasWidth / 2) + (h0 * time);
+            passPos = trainPos + (v * time); // Relative to train start
+
+        } else if (picture === 'interaction') {
+            // Train View: Background moves -H0. Train fixed. Passenger moves V.
+            bgOffset = -(h0 * time);
+            trainPos = canvasWidth / 2;
+            passPos = trainPos + (v * time);
+
+        } else if (picture === 'heisenberg') {
+            // Passenger View: Background moves -(H0+V). Train moves -V. Passenger fixed.
+            bgOffset = -((h0 + v) * time);
+            passPos = canvasWidth / 2;
+            trainPos = passPos - (v * time);
+        }
+
+        // Render
+        drawScenery(bgOffset);
+        
+        // Loop the train visually if it goes off screen (for continuous viewing)
+        // Only loop if not in Interaction/Heisenberg where objects might be stationary
+        let renderTrainX = trainPos;
+        let renderPassX = passPos;
+
+        if (picture === 'schrodinger') {
+             // Keep the camera loosely following if it gets too far
+             if (trainPos > canvasWidth + 100) {
+                 time = 0; // Reset for visual looping
+             }
+        } else if (picture === 'interaction' || picture === 'heisenberg') {
+             if (passPos > canvasWidth + 100 || trainPos < -100) {
+                 time = 0; 
+             }
+        }
+
+        drawTrain(renderTrainX);
+        drawPassenger(renderPassX);
+
+        // Labels
+        ctx.fillStyle = '#cdd6f4';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(`State: |ψ(t)⟩`, renderPassX - 35, groundY - 70);
+        ctx.fillText(`Operator (Train)`, renderTrainX - 45, groundY - 110);
+    }
+
+    function loop(timestamp) {
+        if (!isPlaying) return;
+        
+        const dt = (timestamp - lastTimestamp) / 1000; // seconds
+        lastTimestamp = timestamp;
+        
+        time += dt;
+        draw(dt);
+        updateStatus();
+        
+        animationId = requestAnimationFrame(loop);
+    }
+
+    // Initial draw
+    draw(0);
+
+</script>
+</body>
+</html>

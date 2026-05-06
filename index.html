@@ -1,191 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QUANTUM//MAIN > REPO_TREE</title>
-    <style>
-        /* Define hacker aesthetic variables */
-        :root {
-            --bg-color: #0d0208;
-            --text-color: #00ff41; /* Classic Matrix Green */
-            --dim-text-color: #44aa44;
-            --hlight-color: #ffff33; /* Yellow highlight */
-            --font-stack: 'Courier New', Courier, monospace;
-        }
-
-        /* Basic setup with dark background and monospace font */
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-stack);
-            margin: 2em;
-            padding: 0;
-            overflow-x: hidden;
-        }
-
-        /* A subtle blinking cursor effect on headers */
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
-
-        h2 {
-            border-bottom: 2px solid var(--text-color);
-            padding-bottom: 0.5em;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 10px var(--text-color), 0 0 20px var(--text-color);
-            margin-bottom: 1em;
-        }
-
-        /* Adds a "terminal prompt" prefix to the header */
-        h2::before {
-            content: 'user@quantum:~$ ';
-            color: var(--dim-text-color);
-            text-shadow: none;
-        }
-
-        /* Adds the blinking cursor suffix to the header */
-        h2::after {
-            content: '_';
-            display: inline-block;
-            animation: blink 1s step-end infinite;
-        }
-
-        /* Styling the repo container */
-        #repo-tree {
-            border: 1px solid var(--text-color);
-            padding: 1em;
-            background-color: rgba(26, 10, 20, 0.5); /* Dim background */
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
-            position: relative;
-        }
-
-        /* Adds a "data stream" decoration to the top corner */
-        #repo-tree::after {
-            content: 'RECATIVE_TREE://ALPHA';
-            position: absolute;
-            top: -10px;
-            right: 10px;
-            background-color: var(--bg-color);
-            padding: 0 5px;
-            font-size: 0.8em;
-            color: var(--dim-text-color);
-        }
-
-        /* Styling for the directory tree structure */
-        ul.tree, ul.tree ul {
-            list-style-type: none;
+    <title>Quantum Pictures Visualization</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
             margin: 0;
-            padding: 0;
         }
-
-        ul.tree ul {
-            margin-left: 20px;
-            /* Use a dimmer green for connection lines */
-            border-left: 1px dashed var(--dim-text-color);
-            padding-left: 10px;
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            text-align: center;
         }
-
-        ul.tree li {
-            margin: 5px 0;
-            cursor: pointer;
-            transition: background-color 0.2s, padding-left 0.2s;
+        .control-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .control-group select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        #canvas-wrapper {
+            width: 500px;
+            height: 500px;
+            border: 2px solid #333;
+            background-color: #fafafa;
             position: relative;
         }
-
-        /* Slight hover effect for interactable items */
-        ul.tree li:hover {
-            background-color: rgba(0, 255, 65, 0.1);
-            padding-left: 5px;
+        #visualization-canvas {
+            width: 100%;
+            height: 100%;
         }
-
-        /* Distinguishing directories from files */
-        .dir {
-            font-weight: bold;
-            color: var(--text-color); /* Folders are bright green */
+        .hud {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255,255,255,0.8);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: right;
+            font-size: 0.9em;
         }
-
-        .file {
-            color: #aaeeaa; /* Files are dimmer green/grey-green */
-        }
-
-        /* Add simple visual indicators for icons */
-        .dir::before { content: '[dir] '; color: var(--dim-text-color); font-weight: normal; }
-        .file::before { content: '[fl] '; color: var(--dim-text-color); font-weight: normal; }
-    </style>
+    </style>
 </head>
 <body>
 
-    <h2>Project Structure</h2>
-    <div id="repo-tree">Loading secure data stream...</div>
+    <div class="container">
+        <div class="control-group">
+            <label for="quantum-picture">Choose Quantum Picture:</label>
+            <select id="quantum-picture">
+                <option value="Schrodinger">Schrödinger (States Evolve)</option>
+                <option value="Heisenberg">Heisenberg (Operators Evolve)</option>
+                <option value="Interaction">Interaction (Dirac - Hybrid)</option>
+            </select>
+        </div>
 
-    <script>
-        // --- Configuration (Preserved) ---
-        const owner = 'noisyboy';
-        const repo = 'quantum-mechanics';
-        const branch = 'main'; // or 'master'
+        <div id="canvas-wrapper">
+            <canvas id="visualization-canvas" width="500" height="500"></canvas>
+            <div class="hud" id="hud-display">
+                Picture: Schrödinger<br>
+                Ω_state: 1.0 rad/s<br>
+                Ω_obs: 0.0 rad/s
+            </div>
+        </div>
+    </div>
 
-        async function fetchTree() {
-            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
-            
-            try {
-                const response = await fetch(apiUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                
-                renderTree(data.tree);
-            } catch (error) {
-                document.getElementById('repo-tree').innerHTML = '<span style="color:red">ERROR://ACCESS_DENIED or NETWORK_FAILURE</span>';
-                console.error('Error:', error);
-            }
-        }
+    <script>
+        const canvas = document.getElementById('visualization-canvas');
+        const ctx = canvas.getContext('2d');
+        const hudDisplay = document.getElementById('hud-display');
+        const pictureSelect = document.getElementById('quantum-picture');
 
-        function renderTree(flatTree) {
-            const root = { name: repo, type: 'tree', children: {} };
+        // Simulation parameters
+        const cx = 250; // Center X
+        const cy = 250; // Center Y
+        const radius = 200;
+        const w0 = 0.8; // H_0 angular velocity (fast)
+        const v = 0.15; // V(t) perturbation velocity (slow)
+        const w_total = w0 + v; // Total angular velocity
 
-            // Parse flat paths into a nested object
-            flatTree.forEach(item => {
-                const parts = item.path.split('/');
-                let currentLevel = root;
+        let currentPicture = "Schrodinger";
+        let startTime = Date.now();
 
-                parts.forEach((part, index) => {
-                    if (!currentLevel.children[part]) {
-                        currentLevel.children[part] = {
-                            name: part,
-                            type: index === parts.length - 1 ? item.type : 'tree',
-                            path: item.path,
-                            children: {}
-                        };
-                    }
-                    currentLevel = currentLevel.children[part];
-                });
-            });
+        // Update parameters based on selection
+        pictureSelect.addEventListener('change', function() {
+            currentPicture = this.value;
+            startTime = Date.now(); // Reset time to sync phases
+        });
 
-            // Recursive function to build HTML lists (Icons updated via CSS)
-            function buildHTML(node) {
-                let html = `<ul class="tree">`;
-                for (const key in node.children) {
-                    const child = node.children[key];
-                    const cssClass = child.type === 'tree' ? 'dir' : 'file';
-                    
-                    html += `<li><span class="${cssClass}">${child.name}</span>`;
-                    
-                    if (child.type === 'tree' && Object.keys(child.children).length > 0) {
-                        html += buildHTML(child);
-                    }
-                    html += `</li>`;
-                }
-                html += `</ul>`;
-                return html;
-            }
+        function draw() {
+            // Calculate elapsed time in seconds
+            const time = (Date.now() - startTime) / 1000;
 
-            document.getElementById('repo-tree').innerHTML = buildHTML(root);
-        }
+            // Clear canvas
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Initiate handshake
-        fetchTree();
-    </script>
+            // Determine velocities based on the picture
+            let stateVel, obsVel, obsAngle;
+
+            switch (currentPicture) {
+                case "Schrodinger":
+                    stateVel = w_total;
+                    obsVel = 0;
+                    obsAngle = 0;
+                    break;
+                case "Heisenberg":
+                    stateVel = 0;
+                    obsVel = -w_total; // Operators rotate back
+                    obsAngle = time * obsVel;
+                    break;
+                case "Interaction":
+                    stateVel = v;      // State vector rotates slowly
+                    obsVel = -w0;     // Observable axes rotate back at w0
+                    obsAngle = time * obsVel;
+                    break;
+            }
+
+            // Calculate state vector angle
+            const stateAngle = time * stateVel;
+
+            // Update the HUD
+            hudDisplay.innerHTML = `
+                Picture: ${currentPicture}<br>
+                Ω_state: ${stateVel.toFixed(2)} rad/s<br>
+                Ω_obs: ${obsVel.toFixed(2)} rad/s
+            `;
+
+            // --- Draw Observable Axes (X/Y) ---
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(obsAngle);
+
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(-radius, 0);
+            ctx.lineTo(radius, 0);
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            // Arrow head
+            ctx.beginPath();
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(radius-10, -5);
+            ctx.lineTo(radius-10, 5);
+            ctx.closePath();
+            ctx.fillStyle = '#999';
+            ctx.fill();
+            // Label
+            ctx.fillStyle = '#333';
+            ctx.font = '16px monospace';
+            ctx.fillText("X", radius + 10, 5);
+
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(0, radius);
+            ctx.lineTo(0, -radius);
+            ctx.strokeStyle = '#999';
+            ctx.stroke();
+            // Arrow head
+            ctx.beginPath();
+            ctx.moveTo(0, -radius);
+            ctx.lineTo(-5, -radius+10);
+            ctx.lineTo(5, -radius+10);
+            ctx.closePath();
+            ctx.fill();
+            // Label
+            ctx.fillText("Y", -5, -radius - 15);
+
+            ctx.restore(); // Restore to center
+
+
+            // --- Draw State Vector (|ψ>) ---
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(-stateAngle); // Standard rotation
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(radius, 0);
+            ctx.strokeStyle = '#007bff'; // Blue
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Draw vector head
+            ctx.beginPath();
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(radius-15, -7);
+            ctx.lineTo(radius-15, 7);
+            ctx.closePath();
+            ctx.fillStyle = '#007bff';
+            ctx.fill();
+
+            // Add text label
+            ctx.fillStyle = '#007bff';
+            ctx.font = 'bold 20px serif';
+            ctx.fillText("|ψ⟩", radius + 15, 7);
+
+            ctx.restore();
+
+            requestAnimationFrame(draw);
+        }
+
+        // Start animation loop
+        requestAnimationFrame(draw);
+    </script>
 </body>
 </html>

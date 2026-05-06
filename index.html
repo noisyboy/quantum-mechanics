@@ -1,90 +1,191 @@
-
-<a href="./sims/quantum-pic.html">Quantum Picture</a>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Repository Tree</title>
-    <style>
-        /* Basic styling for the tree */
-        ul.tree, ul.tree ul { list-style-type: none; margin: 0; padding: 0; }
-        ul.tree ul { margin-left: 20px; border-left: 1px solid #ccc; padding-left: 10px; }
-        ul.tree li { margin: 5px 0; font-family: monospace; }
-        .dir { font-weight: bold; color: #0366d6; }
-        .file { color: #24292e; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANTUM//MAIN > REPO_TREE</title>
+    <style>
+        /* Define hacker aesthetic variables */
+        :root {
+            --bg-color: #0d0208;
+            --text-color: #00ff41; /* Classic Matrix Green */
+            --dim-text-color: #44aa44;
+            --hlight-color: #ffff33; /* Yellow highlight */
+            --font-stack: 'Courier New', Courier, monospace;
+        }
+
+        /* Basic setup with dark background and monospace font */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            margin: 2em;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* A subtle blinking cursor effect on headers */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        h2 {
+            border-bottom: 2px solid var(--text-color);
+            padding-bottom: 0.5em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--text-color), 0 0 20px var(--text-color);
+            margin-bottom: 1em;
+        }
+
+        /* Adds a "terminal prompt" prefix to the header */
+        h2::before {
+            content: 'user@quantum:~$ ';
+            color: var(--dim-text-color);
+            text-shadow: none;
+        }
+
+        /* Adds the blinking cursor suffix to the header */
+        h2::after {
+            content: '_';
+            display: inline-block;
+            animation: blink 1s step-end infinite;
+        }
+
+        /* Styling the repo container */
+        #repo-tree {
+            border: 1px solid var(--text-color);
+            padding: 1em;
+            background-color: rgba(26, 10, 20, 0.5); /* Dim background */
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+            position: relative;
+        }
+
+        /* Adds a "data stream" decoration to the top corner */
+        #repo-tree::after {
+            content: 'RECATIVE_TREE://ALPHA';
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            background-color: var(--bg-color);
+            padding: 0 5px;
+            font-size: 0.8em;
+            color: var(--dim-text-color);
+        }
+
+        /* Styling for the directory tree structure */
+        ul.tree, ul.tree ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        ul.tree ul {
+            margin-left: 20px;
+            /* Use a dimmer green for connection lines */
+            border-left: 1px dashed var(--dim-text-color);
+            padding-left: 10px;
+        }
+
+        ul.tree li {
+            margin: 5px 0;
+            cursor: pointer;
+            transition: background-color 0.2s, padding-left 0.2s;
+            position: relative;
+        }
+
+        /* Slight hover effect for interactable items */
+        ul.tree li:hover {
+            background-color: rgba(0, 255, 65, 0.1);
+            padding-left: 5px;
+        }
+
+        /* Distinguishing directories from files */
+        .dir {
+            font-weight: bold;
+            color: var(--text-color); /* Folders are bright green */
+        }
+
+        .file {
+            color: #aaeeaa; /* Files are dimmer green/grey-green */
+        }
+
+        /* Add simple visual indicators for icons */
+        .dir::before { content: '[dir] '; color: var(--dim-text-color); font-weight: normal; }
+        .file::before { content: '[fl] '; color: var(--dim-text-color); font-weight: normal; }
+    </style>
 </head>
 <body>
 
-    <h2>Project Structure</h2>
-    <div id="repo-tree">Loading...</div>
+    <h2>Project Structure</h2>
+    <div id="repo-tree">Loading secure data stream...</div>
 
-    <script>
-        // Configuration: Replace with your actual GitHub username and repository name
-        const owner = 'noisyboy';
-        const repo = 'quantum-mechanics';
-        const branch = 'main'; // or 'master'
+    <script>
+        // --- Configuration (Preserved) ---
+        const owner = 'noisyboy';
+        const repo = 'quantum-mechanics';
+        const branch = 'main'; // or 'master'
 
-        async function fetchTree() {
-            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
-            
-            try {
-                const response = await fetch(apiUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                
-                renderTree(data.tree);
-            } catch (error) {
-                document.getElementById('repo-tree').innerText = 'Error loading repository data.';
-                console.error('Error:', error);
-            }
-        }
+        async function fetchTree() {
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+            
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                renderTree(data.tree);
+            } catch (error) {
+                document.getElementById('repo-tree').innerHTML = '<span style="color:red">ERROR://ACCESS_DENIED or NETWORK_FAILURE</span>';
+                console.error('Error:', error);
+            }
+        }
 
-        function renderTree(flatTree) {
-            const root = { name: repo, type: 'tree', children: {} };
+        function renderTree(flatTree) {
+            const root = { name: repo, type: 'tree', children: {} };
 
-            // Parse flat paths into a nested object
-            flatTree.forEach(item => {
-                const parts = item.path.split('/');
-                let currentLevel = root;
+            // Parse flat paths into a nested object
+            flatTree.forEach(item => {
+                const parts = item.path.split('/');
+                let currentLevel = root;
 
-                parts.forEach((part, index) => {
-                    if (!currentLevel.children[part]) {
-                        currentLevel.children[part] = {
-                            name: part,
-                            type: index === parts.length - 1 ? item.type : 'tree',
-                            path: item.path,
-                            children: {}
-                        };
-                    }
-                    currentLevel = currentLevel.children[part];
-                });
-            });
+                parts.forEach((part, index) => {
+                    if (!currentLevel.children[part]) {
+                        currentLevel.children[part] = {
+                            name: part,
+                            type: index === parts.length - 1 ? item.type : 'tree',
+                            path: item.path,
+                            children: {}
+                        };
+                    }
+                    currentLevel = currentLevel.children[part];
+                });
+            });
 
-            // Recursive function to build HTML lists
-            function buildHTML(node) {
-                let html = `<ul class="tree">`;
-                for (const key in node.children) {
-                    const child = node.children[key];
-                    const icon = child.type === 'tree' ? '📁 ' : '📄 ';
-                    const cssClass = child.type === 'tree' ? 'dir' : 'file';
-                    
-                    html += `<li><span class="${cssClass}">${icon}${child.name}</span>`;
-                    
-                    if (child.type === 'tree' && Object.keys(child.children).length > 0) {
-                        html += buildHTML(child);
-                    }
-                    html += `</li>`;
-                }
-                html += `</ul>`;
-                return html;
-            }
+            // Recursive function to build HTML lists (Icons updated via CSS)
+            function buildHTML(node) {
+                let html = `<ul class="tree">`;
+                for (const key in node.children) {
+                    const child = node.children[key];
+                    const cssClass = child.type === 'tree' ? 'dir' : 'file';
+                    
+                    html += `<li><span class="${cssClass}">${child.name}</span>`;
+                    
+                    if (child.type === 'tree' && Object.keys(child.children).length > 0) {
+                        html += buildHTML(child);
+                    }
+                    html += `</li>`;
+                }
+                html += `</ul>`;
+                return html;
+            }
 
-            document.getElementById('repo-tree').innerHTML = buildHTML(root);
-        }
+            document.getElementById('repo-tree').innerHTML = buildHTML(root);
+        }
 
-        fetchTree();
-    </script>
+        // Initiate handshake
+        fetchTree();
+    </script>
 </body>
 </html>

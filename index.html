@@ -39,103 +39,103 @@
             letter-spacing: 2px;
             color: var(--file-color);
             text-shadow: 0 0 10px var(--file-glow);
-            margin-bottom: 2em;
+            margin-bottom: 1em;
             text-align: center;
         }
 
-        /* Container for the diagram to allow horizontal scrolling */
+        /* Container for the diagram to allow scrolling */
         #repo-tree {
             display: flex;
-            justify-content: center;
+            justify-content: flex-start; /* Start from the left */
+            align-items: center; /* Center the root node vertically */
             overflow-x: auto;
-            padding-bottom: 50px;
-            min-height: 600px;
+            overflow-y: auto;
+            padding: 40px;
+            min-height: 60vh;
         }
 
-        /* --- CSS Tree Graph Logic --- */
+        /* --- CSS Horizontal Tree Graph Logic --- */
         .tree ul {
-            padding-top: 30px;
-            position: relative;
             display: flex;
-            justify-content: center;
-            transition: all 0.5s;
+            flex-direction: column;
+            padding-left: 50px; /* Space between parent and children */
             margin: 0;
-            padding-left: 0;
+            position: relative;
+        }
+
+        .tree > ul {
+            padding-left: 0; /* Remove padding for the absolute root */
         }
 
         .tree li {
-            float: left;
-            text-align: center;
+            display: flex;
+            flex-direction: row;
+            align-items: center; /* Vertically aligns the parent node with its block of children */
             list-style-type: none;
             position: relative;
-            padding: 30px 10px 0 10px;
-            transition: all 0.5s;
+            padding: 15px 0;
         }
 
-        /* Horizontal connection lines */
-        .tree li::before, .tree li::after {
+        /* Horizontal connection lines (Left to Right) */
+        .tree li::before {
             content: '';
             position: absolute;
-            top: 0;
-            right: 50%;
+            left: 0;
+            top: 50%;
+            width: 50px;
             border-top: 2px solid var(--line-color);
-            width: 50%;
-            height: 30px;
-        }
-        .tree li::after {
-            right: auto;
-            left: 50%;
-            border-left: 2px solid var(--line-color);
+            z-index: 1;
         }
 
-        /* Clean up lines for first/last/only children */
-        .tree li:only-child::after, .tree li:only-child::before {
+        /* Vertical spine connecting siblings */
+        .tree li::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            border-left: 2px solid var(--line-color);
+            z-index: 1;
+        }
+
+        /* Clean up lines for first, last, and only children */
+        .tree li:first-child::after {
+            top: 50%;
+        }
+        .tree li:last-child::after {
+            bottom: 50%;
+        }
+        .tree li:only-child::after {
             display: none;
         }
-        .tree li:only-child {
-            padding-top: 0;
-        }
-        .tree li:first-child::before, .tree li:last-child::after {
-            border: 0 none;
-        }
-        .tree li:last-child::before {
-            border-right: 2px solid var(--line-color);
-            border-radius: 0 5px 0 0;
-        }
-        .tree li:first-child::after {
-            border-radius: 5px 0 0 0;
-        }
-
-        /* Downward vertical lines from parents */
-        .tree ul ul::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            border-left: 2px solid var(--line-color);
-            width: 0;
-            height: 30px;
-            transform: translateX(-1px);
+        .tree > ul > li::before, 
+        .tree > ul > li::after {
+            display: none; /* The root node needs no connector lines before it */
         }
 
         /* --- Node Aesthetics (The Cyberpunk Boxes) --- */
         .node {
             background-color: #0a0a0c;
             border: 1px solid;
-            padding: 10px 15px;
+            padding: 12px 18px;
             border-radius: 4px;
             display: inline-block;
             position: relative;
             font-size: 13px;
+            font-family: var(--font-stack);
+            text-decoration: none; /* Remove underline from links */
+            color: var(--text-color);
             z-index: 2;
             min-width: 100px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
             transition: 0.2s;
+            flex-shrink: 0; /* Prevent the box from squishing */
         }
 
         .node:hover {
             transform: scale(1.05);
-            cursor: crosshair;
+            cursor: pointer;
+            z-index: 10;
         }
 
         /* The small logic badge hovering over the node */
@@ -206,6 +206,7 @@
         const owner = 'noisyboy';
         const repo = 'quantum-mechanics';
         const branch = 'main';
+        const githubBaseUrl = `https://github.com/${owner}/${repo}`;
 
         async function fetchTree() {
             const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
@@ -225,9 +226,9 @@
 
         function renderGraphTree(flatTree) {
             // Initialize Root
-            const root = { name: repo, type: 'tree', children: {} };
+            const root = { name: repo, type: 'tree', path: '', children: {} };
 
-            // Parse flat paths into nested object
+            // Parse flat paths into nested object, keeping track of the full path for links
             flatTree.forEach(item => {
                 const parts = item.path.split('/');
                 let currentLevel = root;
@@ -237,6 +238,7 @@
                         currentLevel.children[part] = {
                             name: part,
                             type: index === parts.length - 1 ? item.type : 'tree',
+                            path: parts.slice(0, index + 1).join('/'), // Reconstruct path for URL
                             children: {}
                         };
                     }
@@ -248,7 +250,7 @@
             function buildHTML(node) {
                 let html = `<ul>`;
                 
-                // Sort to keep directories on the left, files on the right
+                // Sort to keep directories on the top, files on the bottom
                 const sortedKeys = Object.keys(node.children).sort((a, b) => {
                     const typeA = node.children[a].type;
                     const typeB = node.children[b].type;
@@ -263,12 +265,16 @@
                     const cssClass = isDir ? 'node dir' : 'node file';
                     const badgeText = isDir ? 'DIR' : 'FILE';
                     
+                    // Determine GitHub URL (tree for folders, blob for files)
+                    const urlType = isDir ? 'tree' : 'blob';
+                    const targetUrl = `${githubBaseUrl}/${urlType}/${branch}/${child.path}`;
+                    
                     html += `<li>`;
                     html += `
-                        <div class="${cssClass}">
+                        <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="${cssClass}">
                             <div class="badge">${badgeText}</div>
                             ${child.name}
-                        </div>
+                        </a>
                     `;
                     
                     if (isDir && Object.keys(child.children).length > 0) {
@@ -282,14 +288,15 @@
             }
 
             // Build the final DOM structure starting with the Root node
+            const rootUrl = `${githubBaseUrl}/tree/${branch}`;
             let finalHtml = `
                 <div class="tree">
                     <ul>
                         <li>
-                            <div class="node root-node">
+                            <a href="${rootUrl}" target="_blank" rel="noopener noreferrer" class="node root-node">
                                 <div class="badge">ROOT</div>
                                 ${root.name}
-                            </div>
+                            </a>
                             ${Object.keys(root.children).length > 0 ? buildHTML(root) : ''}
                         </li>
                     </ul>

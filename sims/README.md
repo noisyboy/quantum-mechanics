@@ -1,3 +1,3 @@
 # Simulations
 
-[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/quqantum-pic.html)
+[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/qunantum-pic.html)

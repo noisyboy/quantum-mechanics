@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superconductor Magnetic Response</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --panel-bg: #1a1d24;
+            --text-main: #a9b1d6;
+            --accent: #7aa2f7;
+            --accent-alert: #f7768e;
+            --grid-line: #292e42;
+            --font-mono: "Fira Code", "JetBrains Mono", Consolas, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 {
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: normal;
+        }
+
+        .dashboard {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--grid-line);
+            border-radius: 4px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px dashed var(--grid-line);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent);
+            width: 200px;
+        }
+
+        label {
+            cursor: pointer;
+        }
+
+        .charts-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .chart {
+            background-color: var(--bg-color);
+            border: 1px solid var(--grid-line);
+        }
+
+        /* D3 Specific Styles */
+        .axis text { fill: var(--text-main); font-family: var(--font-mono); font-size: 12px; }
+        .axis path, .axis line { stroke: var(--grid-line); }
+        .grid line { stroke: var(--grid-line); stroke-opacity: 0.7; shape-rendering: crispEdges; }
+        .grid path { stroke-width: 0; }
+        .line-m { fill: none; stroke: var(--accent-alert); stroke-width: 2.5; }
+        .line-b { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+        .line-ref { fill: none; stroke: var(--text-main); stroke-width: 1.5; stroke-dasharray: 4,4; }
+        .critical-marker { stroke: var(--text-main); stroke-width: 1; stroke-dasharray: 2,2; }
+        .critical-label { fill: var(--text-main); font-size: 12px; text-anchor: middle; font-family: var(--font-mono); }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <h2>Magnetic Response Simulator</h2>
+        
+        <div class="controls">
+            <div class="control-group">
+                <span>Material Type:</span>
+                <label>
+                    <input type="radio" name="scType" value="I" checked> Type I
+                </label>
+                <label>
+                    <input type="radio" name="scType" value="II"> Type II
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label for="tempSlider">T / T<sub>c</sub> : <span id="tempValue">0.00</span></label>
+                <input type="range" id="tempSlider" min="0" max="0.99" step="0.01" value="0">
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div id="chartM" class="chart"></div>
+            <div id="chartB" class="chart"></div>
+        </div>
+    </div>
+
+    <script>
+        // Dimensions
+        const width = 400, height = 350;
+        const margin = { top: 30, right: 30, bottom: 50, left: 50 };
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        // Scales (Arbitrary Units where mu_0 = 1)
+        const xScale = d3.scaleLinear().domain([0, 2.5]).range([0, innerWidth]);
+        const yScaleM = d3.scaleLinear().domain([0, 1.2]).range([innerHeight, 0]);
+        const yScaleB = d3.scaleLinear().domain([0, 2.5]).range([innerHeight, 0]);
+
+        // Base field parameters at T=0
+        const Hc0_I = 1.0;
+        const Hc1_0_II = 0.5;
+        const Hc2_0_II = 2.0;
+
+        // Setup SVG containers
+        const svgM = d3.select("#chartM").append("svg")
+            .attr("width", width).attr("height", height)
+            .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+            
+        const svgB = d3.select("#chartB").append("svg")
+            .attr("width", width).attr("height", height)
+            .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Draw Axes and Grids
+        const drawAxes = (svg, yScale, yLabel, title) => {
+            // Grid
+            svg.append("g").attr("class", "grid")
+                .attr("transform", `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(xScale).tickSize(-innerHeight).tickFormat(""));
+            svg.append("g").attr("class", "grid")
+                .call(d3.axisLeft(yScale).tickSize(-innerWidth).tickFormat(""));
+
+            // Axes
+            svg.append("g").attr("class", "axis")
+                .attr("transform", `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(xScale));
+            svg.append("g").attr("class", "axis")
+                .call(d3.axisLeft(yScale));
+
+            // Labels
+            svg.append("text").attr("x", innerWidth/2).attr("y", innerHeight + 40)
+                .style("fill", "var(--text-main)").style("text-anchor", "middle").text("Applied Field (H)");
+            svg.append("text").attr("transform", "rotate(-90)").attr("x", -innerHeight/2).attr("y", -35)
+                .style("fill", "var(--text-main)").style("text-anchor", "middle").text(yLabel);
+            svg.append("text").attr("x", innerWidth/2).attr("y", -10)
+                .style("fill", "var(--text-main)").style("text-anchor", "middle").text(title);
+        };
+
+        drawAxes(svgM, yScaleM, "-Magnetization (-M)", "-M vs H");
+        drawAxes(svgB, yScaleB, "Internal Flux Density (B)", "B vs H");
+
+        // Reference line B = mu_0 * H
+        svgB.append("line").attr("class", "line-ref")
+            .attr("x1", xScale(0)).attr("y1", yScaleB(0))
+            .attr("x2", xScale(2.5)).attr("y2", yScaleB(2.5));
+
+        // Paths and Markers
+        const pathM = svgM.append("path").attr("class", "line-m");
+        const pathB = svgB.append("path").attr("class", "line-b");
+        
+        const markerGroupM = svgM.append("g");
+        const markerGroupB = svgB.append("g");
+
+        // Physics Logic
+        function updateSimulation() {
+            const type = document.querySelector('input[name="scType"]:checked').value;
+            const t = parseFloat(document.getElementById("tempSlider").value);
+            document.getElementById("tempValue").innerText = t.toFixed(2);
+
+            const tempFactor = 1 - (t * t);
+            const data = [];
+            let markers = [];
+
+            if (type === "I") {
+                const Hc = Hc0_I * tempFactor;
+                markers = [{ val: Hc, label: "H_c" }];
+                
+                // Discretize for sharp jump
+                for (let h = 0; h <= 2.5; h += 0.01) {
+                    if (h <= Hc) {
+                        data.push({ h: h, m: h, b: 0 });
+                    } else if (h > Hc && data[data.length-1].m !== 0) {
+                        // Insert points for sharp vertical drop/jump
+                        data.push({ h: Hc, m: 0, b: Hc }); 
+                        data.push({ h: h, m: 0, b: h });
+                    } else {
+                        data.push({ h: h, m: 0, b: h });
+                    }
+                }
+            } else {
+                const Hc1 = Hc1_0_II * tempFactor;
+                const Hc2 = Hc2_0_II * tempFactor;
+                markers = [{ val: Hc1, label: "H_c1" }, { val: Hc2, label: "H_c2" }];
+
+                for (let h = 0; h <= 2.5; h += 0.01) {
+                    if (h <= Hc1) {
+                        data.push({ h: h, m: h, b: 0 });
+                    } else if (h <= Hc2) {
+                        // Non-linear decay for -M (convex curve)
+                        const m = Hc1 * Math.pow((Hc2 - h) / (Hc2 - Hc1), 2);
+                        data.push({ h: h, m: m, b: h - m }); // B = mu_0(H + M) -> in our coords B = H - (-M)
+                    } else {
+                        data.push({ h: h, m: 0, b: h });
+                    }
+                }
+            }
+
+            // Line generators
+            const lineGenM = d3.line().x(d => xScale(d.h)).y(d => yScaleM(d.m));
+            const lineGenB = d3.line().x(d => xScale(d.h)).y(d => yScaleB(d.b));
+
+            // Update lines
+            pathM.datum(data).attr("d", lineGenM);
+            pathB.datum(data).attr("d", lineGenB);
+
+            // Update Markers
+            const updateMarkers = (group, scaleY) => {
+                const lines = group.selectAll("line").data(markers);
+                lines.enter().append("line").attr("class", "critical-marker")
+                    .merge(lines)
+                    .attr("x1", d => xScale(d.val)).attr("x2", d => xScale(d.val))
+                    .attr("y1", scaleY.range()[0]).attr("y2", scaleY.range()[1]);
+                lines.exit().remove();
+
+                const texts = group.selectAll("text").data(markers);
+                texts.enter().append("text").attr("class", "critical-label")
+                    .merge(texts)
+                    .attr("x", d => xScale(d.val))
+                    .attr("y", scaleY.range()[1] - 10)
+                    .text(d => d.label);
+                texts.exit().remove();
+            };
+
+            updateMarkers(markerGroupM, yScaleM);
+            updateMarkers(markerGroupB, yScaleB);
+        }
+
+        // Event Listeners
+        document.querySelectorAll('input[name="scType"]').forEach(r => r.addEventListener('change', updateSimulation));
+        document.getElementById("tempSlider").addEventListener('input', updateSimulation);
+
+        // Initial render
+        updateSimulation();
+    </script>
+</body>
+</html>

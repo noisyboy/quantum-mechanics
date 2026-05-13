@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>N-Channel JFET Physics Simulation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f4f9; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 900px; }
+        h1 { text-align: center; color: #2c3e50; font-size: 24px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .controls { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; background: #ecf0f1; border-radius: 8px; }
+        .control-group { display: flex; flex-direction: column; align-items: center; font-weight: bold; }
+        input[type=range] { width: 250px; margin-top: 10px; }
+        .visualizations { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; }
+        .canvas-container { flex: 1; min-width: 400px; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        canvas { max-width: 100%; }
+        .formula { font-family: 'Courier New', Courier, monospace; background: #e8f4f8; padding: 15px; border-radius: 5px; margin-top: 15px; text-align: center; font-size: 15px; border-left: 4px solid #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>N-Channel JFET: Depletion Region & I-V Characteristics</h1>
+        <p style="text-align: center; font-size: 14px; color: #555; max-width: 700px; margin: 0 auto;">
+            Explore the solid-state mechanics of channel pinch-off and charge carrier saturation. 
+            The depletion region width is modeled dynamically based on the localized reverse bias potential along the length of the channel.
+        </p>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="vgs">Gate-Source Voltage (V<sub>GS</sub>): <span id="vgs-val" style="color: #c0392b;">0</span> V</label>
+                <input type="range" id="vgs" min="-5" max="0" step="0.1" value="0">
+            </div>
+            <div class="control-group">
+                <label for="vds">Drain-Source Voltage (V<sub>DS</sub>): <span id="vds-val" style="color: #2980b9;">0</span> V</label>
+                <input type="range" id="vds" min="0" max="15" step="0.1" value="0">
+            </div>
+        </div>
+
+        <div class="visualizations">
+            <div class="canvas-container">
+                <h3 style="color: #2c3e50; margin-top: 0;">Cross-Sectional Model</h3>
+                <canvas id="jfetCanvas" width="400" height="320"></canvas>
+            </div>
+            <div class="canvas-container">
+                <h3 style="color: #2c3e50; margin-top: 0;">I<sub>D</sub> vs V<sub>DS</sub> Curve</h3>
+                <canvas id="ivChart" width="400" height="320"></canvas>
+            </div>
+        </div>
+
+        <div class="formula">
+            <strong>Shockley Equation (Saturation Region):</strong> I<sub>D</sub> = I<sub>DSS</sub> (1 - V<sub>GS</sub> / V<sub>P</sub>)² <br><br>
+            <span style="color: #666; font-size: 13px;"><em>Model parameters: Pinch-off Voltage (V<sub>P</sub>) = -4.0 V, Saturation Current (I<sub>DSS</sub>) = 10.0 mA</em></span>
+        </div>
+    </div>
+
+    <script>
+        const vgsInput = document.getElementById('vgs');
+        const vdsInput = document.getElementById('vds');
+        const vgsVal = document.getElementById('vgs-val');
+        const vdsVal = document.getElementById('vds-val');
+        const canvas = document.getElementById('jfetCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const Vp = -4.0;
+        const Idss = 10.0;
+
+        let chart;
+
+        function drawJFET() {
+            const vgs = parseFloat(vgsInput.value);
+            const vds = parseFloat(vdsInput.value);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Base Dimensions
+            const w = 160;
+            const h = 220;
+            const x = 120;
+            const y = 50;
+
+            // N-channel (light blue)
+            ctx.fillStyle = '#b3e5fc';
+            ctx.fillRect(x, y, w, h);
+
+            // Terminals and Contacts
+            ctx.fillStyle = '#333';
+            ctx.font = '14px Segoe UI';
+            ctx.textAlign = 'center';
+            
+            // Source (Bottom)
+            ctx.fillText('Source (n+)', x + w/2, y + h + 25);
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillRect(x + w/2 - 40, y + h, 80, 8); 
+            
+            // Drain (Top)
+            ctx.fillStyle = '#333';
+            ctx.fillText('Drain (n+)', x + w/2, y - 15);
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillRect(x + w/2 - 40, y - 8, 80, 8); 
+
+            // P-type Gate Regions (Pink)
+            ctx.fillStyle = '#f8bbd0';
+            ctx.fillRect(x - 30, y + 40, 30, 140); // Left
+            ctx.fillRect(x + w, y + 40, 30, 140);  // Right
+
+            ctx.fillStyle = '#333';
+            ctx.fillText('Gate (p+)', x - 55, y + 115);
+            ctx.fillText('Gate (p+)', x + w + 55, y + 115);
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillRect(x - 38, y + 80, 8, 60); 
+            ctx.fillRect(x + w + 30, y + 80, 8, 60);
+
+            // Calculate Depletion Widths based on abrupt p-n junction approximation
+            const maxDep = w / 2; // Full pinch-off width
+            
+            // Clamp voltages for calculation to prevent overlapping beyond center
+            const vgsEff = Math.max(vgs, Vp);
+            let depSource = maxDep * Math.sqrt(Math.abs(vgsEff) / Math.abs(Vp));
+            
+            const vgd = vgs - vds; // Reverse bias at drain end
+            const vgdEff = Math.max(vgd, Vp);
+            let depDrain = maxDep * Math.sqrt(Math.abs(vgdEff) / Math.abs(Vp));
+
+            if (vgs <= Vp) {
+                depSource = maxDep;
+                depDrain = maxDep;
+            }
+
+            // Draw Depletion Regions
+            ctx.fillStyle = 'rgba(189, 195, 199, 0.8)';
+            
+            // Left Depletion
+            ctx.beginPath();
+            ctx.moveTo(x, y + 40);
+            ctx.lineTo(x + depDrain, y + 40);
+            ctx.lineTo(x + depSource, y + 180);
+            ctx.lineTo(x, y + 180);
+            ctx.closePath();
+            ctx.fill();
+            // Left border
+            ctx.strokeStyle = '#7f8c8d';
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+
+            // Right Depletion
+            ctx.beginPath();
+            ctx.moveTo(x + w, y + 40);
+            ctx.lineTo(x + w - depDrain, y + 40);
+            ctx.lineTo(x + w - depSource, y + 180);
+            ctx.lineTo(x + w, y + 180);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+            
+            // Electric Field / Pinch-off Indicator
+            if (depDrain >= maxDep - 0.5) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = 'bold 13px Segoe UI';
+                ctx.fillText('Channel Pinched-Off', x + w/2, y + 115);
+            } else if (vds > 0) {
+                // Draw some carrier drift arrows if not pinched off fully at source
+                ctx.fillStyle = 'rgba(52, 152, 219, 0.5)';
+                ctx.font = '16px Arial';
+                ctx.fillText('↑ e-', x + w/2, y + 160);
+                ctx.fillText('↑ e-', x + w/2, y + 80);
+            }
+        }
+
+        // Rigorous calculation for I_D
+        function calcId(vgs, vds) {
+            if (vgs <= Vp) return 0; // Cut-off
+            
+            const vdsSat = vgs - Vp;
+            if (vds < vdsSat) {
+                // Ohmic/Linear region: Integral of channel resistance
+                return (2 * Idss / Math.pow(Vp, 2)) * ((vgs - Vp)*vds - (Math.pow(vds, 2) / 2));
+            } else {
+                // Saturation region: Shockley ideal model
+                return Idss * Math.pow(1 - (vgs / Vp), 2);
+            }
+        }
+
+        function updateChart() {
+            const vgs = parseFloat(vgsInput.value);
+            const currentVds = parseFloat(vdsInput.value);
+            
+            const dataPoints = [];
+            for (let v = 0; v <= 15; v += 0.2) {
+                dataPoints.push({x: v, y: calcId(vgs, v)});
+            }
+
+            const currentId = calcId(vgs, currentVds);
+
+            if (chart) {
+                chart.data.datasets[0].data = dataPoints;
+                chart.data.datasets[1].data = [{x: currentVds, y: currentId}];
+                chart.data.datasets[0].label = `Transfer Curve (VGS = ${vgs.toFixed(1)}V)`;
+                chart.update();
+            } else {
+                const ctxChart = document.getElementById('ivChart').getContext('2d');
+                chart = new Chart(ctxChart, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: `Transfer Curve (VGS = ${vgs.toFixed(1)}V)`,
+                            data: dataPoints,
+                            borderColor: '#2980b9',
+                            backgroundColor: 'rgba(41, 128, 185, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }, {
+                            label: 'Operating Point',
+                            data: [{x: currentVds, y: currentId}],
+                            backgroundColor: '#e74c3c',
+                            borderColor: '#c0392b',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            type: 'scatter'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Drain-Source Voltage (V)', font: {weight: 'bold'} }, min: 0, max: 15 },
+                            y: { title: { display: true, text: 'Drain Current (mA)', font: {weight: 'bold'} }, min: 0, max: 12 }
+                        },
+                        animation: { duration: 200 }
+                    }
+                });
+            }
+        }
+
+        function update() {
+            vgsVal.innerText = parseFloat(vgsInput.value).toFixed(1);
+            vdsVal.innerText = parseFloat(vdsInput.value).toFixed(1);
+            drawJFET();
+            updateChart();
+        }
+
+        vgsInput.addEventListener('input', update);
+        vdsInput.addEventListener('input', update);
+
+        // Init
+        update();
+    </script>
+</body>
+</html>

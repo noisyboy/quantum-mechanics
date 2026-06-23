@@ -12,4 +12,10 @@ An interactive model visualizing unitary time evolution across the Schrödinger,
 This interactive model visualizes the device physics of an N-Channel Junction Field-Effect Transistor. It dynamically maps the space-charge (depletion) region boundaries governed by the localized reverse-bias potentials ($V_{GS}$ and $V_{DS}$). The simulation couples a cross-sectional physical view with real-time plotting of the output characteristic curve ($I_D$ vs. $V_{DS}$), explicitly demonstrating the solid-state transition mechanics between the Ohmic linear regime, channel pinch-off (saturation), and total charge carrier depletion (cut-off) based on the ideal Shockley model.
 
 
-[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/quantum-pic.html)
+[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/jfet.htm)
+
+* ### **Superconducting Magnetic Response Simulator**
+This interactive model visualizes the phenomenological electrodynamics of superconducting states under external magnetic fields ($H$) and varying reduced temperatures ($T/T_c$). The simulation contrasts the magnetic phase transitions of Type I and Type II materials. It dynamically plots the characteristic magnetization ($-M$ vs $H$) and internal flux density ($B$ vs $H$) curves, explicitly demonstrating the perfect diamagnetism of the Meissner state up to the thermodynamic critical field ($H_c$) for Type I, and the partial flux penetration of the mixed Abrikosov vortex state (bounded by $H_{c1}$ and $H_{c2}$) for Type II superconductors.
+
+
+[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/superconductors.htm)

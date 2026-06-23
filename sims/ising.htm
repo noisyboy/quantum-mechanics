@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Ising Model Simulator</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { background: #161b22; padding: 25px; border-radius: 8px; border: 1px solid #30363d; width: 100%; max-width: 900px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        h1 { text-align: center; color: #58a6ff; font-size: 24px; border-bottom: 1px solid #30363d; padding-bottom: 10px; margin-top: 0; }
+        .controls { display: flex; justify-content: space-around; align-items: center; margin: 20px 0; padding: 15px; background: #0d1117; border-radius: 8px; border: 1px solid #30363d; flex-wrap: wrap; gap: 15px; }
+        .control-group { display: flex; flex-direction: column; align-items: center; font-weight: bold; width: 250px; }
+        input[type=range] { width: 100%; margin-top: 10px; cursor: pointer; }
+        button { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; height: 40px; }
+        button:hover { background: #2ea043; }
+        .visualizations { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; }
+        .canvas-container { flex: 1; min-width: 400px; background: #010409; border: 1px solid #30363d; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        canvas { display: block; border: 1px solid #30363d; background: #000; }
+        .explanation { background: #0d1117; padding: 15px; border-radius: 5px; margin-top: 15px; font-size: 14px; border-left: 4px solid #58a6ff; line-height: 1.5; color: #8b949e; }
+        h3 { color: #c9d1d9; margin-top: 0; text-align: center; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>2D Ising Model: Ferromagnetic Phase Transition</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="tempRatio">Temperature (T / T<sub>c</sub>): <span id="temp-val" style="color: #ff7b72;">1.00</span></label>
+                <input type="range" id="tempRatio" min="0.1" max="3.0" step="0.05" value="1.0">
+            </div>
+            <div class="control-group">
+                <label for="extField">External Field (H): <span id="field-val" style="color: #a5d6ff;">0.00</span></label>
+                <input type="range" id="extField" min="-2.0" max="2.0" step="0.1" value="0.0">
+            </div>
+            <div>
+                <button id="reset-btn">Randomize Lattice</button>
+            </div>
+        </div>
+
+        <div class="visualizations">
+            <div class="canvas-container">
+                <h3>Spin Lattice</h3>
+                <canvas id="latticeCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="canvas-container">
+                <h3>Macroscopic Magnetization (M)</h3>
+                <canvas id="chartCanvas" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        <div class="explanation">
+            <strong>The Physics:</strong> The Metropolis-Hastings algorithm evaluates the energy cost of flipping a spin based on its nearest neighbors and the external field. Below $T_c$, spontaneous symmetry breaking occurs as correlation lengths diverge, creating massive domain walls.
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const tempInput = document.getElementById('tempRatio');
+        const tempVal = document.getElementById('temp-val');
+        const fieldInput = document.getElementById('extField');
+        const fieldVal = document.getElementById('field-val');
+        const resetBtn = document.getElementById('reset-btn');
+        
+        const latticeCanvas = document.getElementById('latticeCanvas');
+        const latticeCtx = latticeCanvas.getContext('2d');
+        
+        const chartCanvas = document.getElementById('chartCanvas');
+        const chartCtx = chartCanvas.getContext('2d');
+
+        // Physics Constants & State
+        const L = 100; // Lattice size (100x100)
+        const N = L * L;
+        const Tc = 2.269; // Critical temperature for 2D square lattice (Onsager solution)
+        
+        let lattice = new Int8Array(N);
+        let magnetizationHistory = [];
+        const maxHistory = 200;
+
+        // Image Data for extremely fast canvas rendering
+        const pixelSize = latticeCanvas.width / L;
+        let imgData = latticeCtx.createImageData(L, L);
+
+        function initLattice() {
+            for (let i = 0; i < N; i++) {
+                lattice[i] = Math.random() > 0.5 ? 1 : -1;
+            }
+            magnetizationHistory = new Array(maxHistory).fill(0);
+        }
+
+        // Metropolis-Hastings Algorithm
+        function monteCarloSweep() {
+            const T = parseFloat(tempInput.value) * Tc;
+            const H = parseFloat(fieldInput.value);
+
+            // One sweep = N random updates
+            for (let step = 0; step < N; step++) {
+                const idx = Math.floor(Math.random() * N);
+                const i = Math.floor(idx / L);
+                const j = idx % L;
+
+                const s = lattice[idx];
+
+                // Periodic Boundary Conditions (Torus)
+                const up = lattice[((i - 1 + L) % L) * L + j];
+                const down = lattice[((i + 1) % L) * L + j];
+                const left = lattice[i * L + ((j - 1 + L) % L)];
+                const right = lattice[i * L + ((j + 1) % L)];
+
+                const sumNeighbors = up + down + left + right;
+                
+                // Change in energy if we flip the spin
+                const deltaE = 2 * s * (sumNeighbors + H);
+
+                // Flip criteria
+                if (deltaE <= 0 || Math.random() < Math.exp(-deltaE / T)) {
+                    lattice[idx] = -s;
+                }
+            }
+        }
+
+        function getMagnetization() {
+            let sum = 0;
+            for (let i = 0; i < N; i++) {
+                sum += lattice[i];
+            }
+            return sum / N;
+        }
+
+        function drawLattice() {
+            // Write directly to pixel buffer for performance
+            for (let i = 0; i < N; i++) {
+                const pxIdx = i * 4;
+                if (lattice[i] === 1) {
+                    // Spin Up: Blue (#58a6ff)
+                    imgData.data[pxIdx] = 88;
+                    imgData.data[pxIdx + 1] = 166;
+                    imgData.data[pxIdx + 2] = 255;
+                    imgData.data[pxIdx + 3] = 255;
+                } else {
+                    // Spin Down: Red (#ff7b72)
+                    imgData.data[pxIdx] = 255;
+                    imgData.data[pxIdx + 1] = 123;
+                    imgData.data[pxIdx + 2] = 114;
+                    imgData.data[pxIdx + 3] = 255;
+                }
+            }
+            
+            // Draw buffer to an offscreen canvas to scale it up cleanly without blurring
+            const offscreen = document.createElement('canvas');
+            offscreen.width = L;
+            offscreen.height = L;
+            offscreen.getContext('2d').putImageData(imgData, 0, 0);
+            
+            latticeCtx.imageSmoothingEnabled = false; // Prevent blurry pixels
+            latticeCtx.clearRect(0, 0, latticeCanvas.width, latticeCanvas.height);
+            latticeCtx.drawImage(offscreen, 0, 0, latticeCanvas.width, latticeCanvas.height);
+        }
+
+        function drawChart() {
+            chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
+            const padX = 40;
+            const padY = 20;
+            const w = chartCanvas.width - padX - 10;
+            const h = chartCanvas.height - padY * 2;
+            const midY = padY + h / 2;
+
+            // Grid & Axes
+            chartCtx.strokeStyle = '#30363d';
+            chartCtx.lineWidth = 1;
+            
+            // Center line (M=0)
+            chartCtx.beginPath();
+            chartCtx.moveTo(padX, midY);
+            chartCtx.lineTo(padX + w, midY);
+            chartCtx.stroke();
+
+            // Y-axis
+            chartCtx.beginPath();
+            chartCtx.moveTo(padX, padY);
+            chartCtx.lineTo(padX, padY + h);
+            chartCtx.strokeStyle = '#c9d1d9';
+            chartCtx.stroke();
+
+            // Labels
+            chartCtx.fillStyle = '#8b949e';
+            chartCtx.font = '12px Segoe UI';
+            chartCtx.textAlign = 'right';
+            chartCtx.fillText('+1.0', padX - 8, padY + 4);
+            chartCtx.fillText(' 0.0', padX - 8, midY + 4);
+            chartCtx.fillText('-1.0', padX - 8, padY + h + 4);
+
+            // Draw Data Line
+            chartCtx.beginPath();
+            const dx = w / (maxHistory - 1);
+            
+            for (let i = 0; i < maxHistory; i++) {
+                const x = padX + i * dx;
+                // Map M from [-1, 1] to canvas coordinates
+                const y = midY - (magnetizationHistory[i] * (h / 2)); 
+                
+                if (i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            }
+            
+            chartCtx.strokeStyle = '#a5d6ff';
+            chartCtx.lineWidth = 2;
+            chartCtx.stroke();
+        }
+
+        function update() {
+            // Update UI
+            tempVal.innerText = parseFloat(tempInput.value).toFixed(2);
+            fieldVal.innerText = parseFloat(fieldInput.value).toFixed(2);
+
+            // Run Physics (multiple sweeps per frame for visual speed)
+            for (let i = 0; i < 5; i++) {
+                monteCarloSweep();
+            }
+
+            // Record Data
+            const currentM = getMagnetization();
+            magnetizationHistory.push(currentM);
+            if (magnetizationHistory.length > maxHistory) {
+                magnetizationHistory.shift();
+            }
+
+            // Render
+            drawLattice();
+            drawChart();
+
+            requestAnimationFrame(update);
+        }
+
+        // Listeners
+        resetBtn.addEventListener('click', initLattice);
+
+        // Boot
+        initLattice();
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>

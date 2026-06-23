@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>N-Channel JFET Physics Simulation</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js/auto"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f4f9; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 900px; }
@@ -42,7 +42,7 @@
                 <canvas id="jfetCanvas" width="400" height="320"></canvas>
             </div>
             <div class="canvas-container">
-                <h3 style="color: #2c3e50; margin-top: 0;">I<sub>D</sub> vs V<sub>DS</sub> Curve</h3>
+                <h3 style="color: #2c3e50; margin-top: 0;">Output Characteristic</h3>
                 <canvas id="ivChart" width="400" height="320"></canvas>
             </div>
         </div>
@@ -110,14 +110,13 @@
             ctx.fillRect(x - 38, y + 80, 8, 60); 
             ctx.fillRect(x + w + 30, y + 80, 8, 60);
 
-            // Calculate Depletion Widths based on abrupt p-n junction approximation
-            const maxDep = w / 2; // Full pinch-off width
+            // Calculate Depletion Widths
+            const maxDep = w / 2; 
             
-            // Clamp voltages for calculation to prevent overlapping beyond center
             const vgsEff = Math.max(vgs, Vp);
             let depSource = maxDep * Math.sqrt(Math.abs(vgsEff) / Math.abs(Vp));
             
-            const vgd = vgs - vds; // Reverse bias at drain end
+            const vgd = vgs - vds;
             const vgdEff = Math.max(vgd, Vp);
             let depDrain = maxDep * Math.sqrt(Math.abs(vgdEff) / Math.abs(Vp));
 
@@ -137,7 +136,7 @@
             ctx.lineTo(x, y + 180);
             ctx.closePath();
             ctx.fill();
-            // Left border
+            
             ctx.strokeStyle = '#7f8c8d';
             ctx.setLineDash([4, 4]);
             ctx.stroke();
@@ -151,32 +150,39 @@
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.setLineDash([]); // Reset
+            ctx.setLineDash([]); 
             
-            // Electric Field / Pinch-off Indicator
-            if (depDrain >= maxDep - 0.5) {
+            // Physics Logic Fix: Distinguish Cut-off vs Saturation
+            if (vgs <= Vp) {
+                // Cut-off: Full channel pinched off, no current
                 ctx.fillStyle = '#e74c3c';
                 ctx.font = 'bold 13px Segoe UI';
-                ctx.fillText('Channel Pinched-Off', x + w/2, y + 115);
-            } else if (vds > 0) {
-                // Draw some carrier drift arrows if not pinched off fully at source
-                ctx.fillStyle = 'rgba(52, 152, 219, 0.5)';
-                ctx.font = '16px Arial';
-                ctx.fillText('↑ e-', x + w/2, y + 160);
-                ctx.fillText('↑ e-', x + w/2, y + 80);
+                ctx.fillText('Cut-off (No Current)', x + w/2, y + 115);
+            } else {
+                if (depDrain >= maxDep - 0.5) {
+                    // Saturation: Pinched at drain, but current flows max
+                    ctx.fillStyle = '#e67e22';
+                    ctx.font = 'bold 12px Segoe UI';
+                    ctx.fillText('Saturation (Pinched-off)', x + w/2, y + 115);
+                }
+                
+                if (vds > 0) {
+                    // Electrons drift in both Ohmic and Saturation regions
+                    ctx.fillStyle = 'rgba(52, 152, 219, 0.6)';
+                    ctx.font = '16px Arial';
+                    ctx.fillText('↑ e-', x + w/2, y + 160);
+                    ctx.fillText('↑ e-', x + w/2, y + 75);
+                }
             }
         }
 
-        // Rigorous calculation for I_D
         function calcId(vgs, vds) {
-            if (vgs <= Vp) return 0; // Cut-off
+            if (vgs <= Vp) return 0; 
             
             const vdsSat = vgs - Vp;
             if (vds < vdsSat) {
-                // Ohmic/Linear region: Integral of channel resistance
                 return (2 * Idss / Math.pow(Vp, 2)) * ((vgs - Vp)*vds - (Math.pow(vds, 2) / 2));
             } else {
-                // Saturation region: Shockley ideal model
                 return Idss * Math.pow(1 - (vgs / Vp), 2);
             }
         }
@@ -195,7 +201,8 @@
             if (chart) {
                 chart.data.datasets[0].data = dataPoints;
                 chart.data.datasets[1].data = [{x: currentVds, y: currentId}];
-                chart.data.datasets[0].label = `Transfer Curve (VGS = ${vgs.toFixed(1)}V)`;
+                // Fixed Label: This is an Output Curve, not a Transfer Curve
+                chart.data.datasets[0].label = `Output Curve (VGS = ${vgs.toFixed(1)}V)`;
                 chart.update();
             } else {
                 const ctxChart = document.getElementById('ivChart').getContext('2d');
@@ -203,7 +210,7 @@
                     type: 'line',
                     data: {
                         datasets: [{
-                            label: `Transfer Curve (VGS = ${vgs.toFixed(1)}V)`,
+                            label: `Output Curve (VGS = ${vgs.toFixed(1)}V)`,
                             data: dataPoints,
                             borderColor: '#2980b9',
                             backgroundColor: 'rgba(41, 128, 185, 0.1)',
@@ -244,7 +251,6 @@
         vgsInput.addEventListener('input', update);
         vdsInput.addEventListener('input', update);
 
-        // Init
         update();
     </script>
 </body>

@@ -36,16 +36,18 @@
             </div>
         </div>
 
-        <div class="visualizations">
-            <div class="canvas-container">
-                <h3 style="color: #2c3e50; margin-top: 0;">Cross-Sectional Model</h3>
-                <canvas id="jfetCanvas" width="400" height="320"></canvas>
-            </div>
-            <div class="canvas-container">
-                <h3 style="color: #2c3e50; margin-top: 0;">Output Characteristic</h3>
-                <canvas id="ivChart" width="400" height="320"></canvas>
-            </div>
+ <div class="visualizations">
+    <div class="canvas-container">
+        <h3 style="color: #2c3e50; margin-top: 0;">Cross-Sectional Model</h3>
+        <canvas id="jfetCanvas" width="400" height="320" style="display: block;"></canvas>
+    </div>
+    <div class="canvas-container">
+        <h3 style="color: #2c3e50; margin-top: 0;">Output Characteristic</h3>
+        <div style="position: relative; height: 320px; width: 100%;">
+            <canvas id="ivChart"></canvas>
         </div>
+    </div>
+</div>
 
         <div class="formula">
             <strong>Shockley Equation (Saturation Region):</strong> I<sub>D</sub> = I<sub>DSS</sub> (1 - V<sub>GS</sub> / V<sub>P</sub>)² <br><br>

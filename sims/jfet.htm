@@ -53,206 +53,229 @@
             <span style="color: #666; font-size: 13px;"><em>Model parameters: Pinch-off Voltage (V<sub>P</sub>) = -4.0 V, Saturation Current (I<sub>DSS</sub>) = 10.0 mA</em></span>
         </div>
     </div>
+<script>
+    const vgsInput = document.getElementById('vgs');
+    const vdsInput = document.getElementById('vds');
+    const vgsVal = document.getElementById('vgs-val');
+    const vdsVal = document.getElementById('vds-val');
+    
+    const jfetCanvas = document.getElementById('jfetCanvas');
+    const jfetCtx = jfetCanvas.getContext('2d');
+    
+    const chartCanvas = document.getElementById('ivChart');
+    const chartCtx = chartCanvas.getContext('2d');
 
-    <script>
-        const vgsInput = document.getElementById('vgs');
-        const vdsInput = document.getElementById('vds');
-        const vgsVal = document.getElementById('vgs-val');
-        const vdsVal = document.getElementById('vds-val');
-        const canvas = document.getElementById('jfetCanvas');
-        const ctx = canvas.getContext('2d');
+    const Vp = -4.0;
+    const Idss = 10.0;
 
-        const Vp = -4.0;
-        const Idss = 10.0;
+    function drawJFET() {
+        const vgs = parseFloat(vgsInput.value);
+        const vds = parseFloat(vdsInput.value);
 
-        let chart;
+        jfetCtx.clearRect(0, 0, jfetCanvas.width, jfetCanvas.height);
 
-        function drawJFET() {
-            const vgs = parseFloat(vgsInput.value);
-            const vds = parseFloat(vdsInput.value);
+        // Base Dimensions
+        const w = 160;
+        const h = 220;
+        const x = 120;
+        const y = 50;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // N-channel (light blue)
+        jfetCtx.fillStyle = '#b3e5fc';
+        jfetCtx.fillRect(x, y, w, h);
 
-            // Base Dimensions
-            const w = 160;
-            const h = 220;
-            const x = 120;
-            const y = 50;
+        // Terminals and Contacts
+        jfetCtx.fillStyle = '#333';
+        jfetCtx.font = '14px Segoe UI';
+        jfetCtx.textAlign = 'center';
+        
+        jfetCtx.fillText('Source (n+)', x + w/2, y + h + 25);
+        jfetCtx.fillStyle = '#7f8c8d';
+        jfetCtx.fillRect(x + w/2 - 40, y + h, 80, 8); 
+        
+        jfetCtx.fillStyle = '#333';
+        jfetCtx.fillText('Drain (n+)', x + w/2, y - 15);
+        jfetCtx.fillStyle = '#7f8c8d';
+        jfetCtx.fillRect(x + w/2 - 40, y - 8, 80, 8); 
 
-            // N-channel (light blue)
-            ctx.fillStyle = '#b3e5fc';
-            ctx.fillRect(x, y, w, h);
+        // P-type Gate Regions (Pink)
+        jfetCtx.fillStyle = '#f8bbd0';
+        jfetCtx.fillRect(x - 30, y + 40, 30, 140);
+        jfetCtx.fillRect(x + w, y + 40, 30, 140);
 
-            // Terminals and Contacts
-            ctx.fillStyle = '#333';
-            ctx.font = '14px Segoe UI';
-            ctx.textAlign = 'center';
-            
-            // Source (Bottom)
-            ctx.fillText('Source (n+)', x + w/2, y + h + 25);
-            ctx.fillStyle = '#7f8c8d';
-            ctx.fillRect(x + w/2 - 40, y + h, 80, 8); 
-            
-            // Drain (Top)
-            ctx.fillStyle = '#333';
-            ctx.fillText('Drain (n+)', x + w/2, y - 15);
-            ctx.fillStyle = '#7f8c8d';
-            ctx.fillRect(x + w/2 - 40, y - 8, 80, 8); 
+        jfetCtx.fillStyle = '#333';
+        jfetCtx.fillText('Gate (p+)', x - 55, y + 115);
+        jfetCtx.fillText('Gate (p+)', x + w + 55, y + 115);
+        jfetCtx.fillStyle = '#7f8c8d';
+        jfetCtx.fillRect(x - 38, y + 80, 8, 60); 
+        jfetCtx.fillRect(x + w + 30, y + 80, 8, 60);
 
-            // P-type Gate Regions (Pink)
-            ctx.fillStyle = '#f8bbd0';
-            ctx.fillRect(x - 30, y + 40, 30, 140); // Left
-            ctx.fillRect(x + w, y + 40, 30, 140);  // Right
+        // Calculate Depletion Widths
+        const maxDep = w / 2; 
+        const vgsEff = Math.max(vgs, Vp);
+        let depSource = maxDep * Math.sqrt(Math.abs(vgsEff) / Math.abs(Vp));
+        
+        const vgd = vgs - vds;
+        const vgdEff = Math.max(vgd, Vp);
+        let depDrain = maxDep * Math.sqrt(Math.abs(vgdEff) / Math.abs(Vp));
 
-            ctx.fillStyle = '#333';
-            ctx.fillText('Gate (p+)', x - 55, y + 115);
-            ctx.fillText('Gate (p+)', x + w + 55, y + 115);
-            ctx.fillStyle = '#7f8c8d';
-            ctx.fillRect(x - 38, y + 80, 8, 60); 
-            ctx.fillRect(x + w + 30, y + 80, 8, 60);
-
-            // Calculate Depletion Widths
-            const maxDep = w / 2; 
-            
-            const vgsEff = Math.max(vgs, Vp);
-            let depSource = maxDep * Math.sqrt(Math.abs(vgsEff) / Math.abs(Vp));
-            
-            const vgd = vgs - vds;
-            const vgdEff = Math.max(vgd, Vp);
-            let depDrain = maxDep * Math.sqrt(Math.abs(vgdEff) / Math.abs(Vp));
-
-            if (vgs <= Vp) {
-                depSource = maxDep;
-                depDrain = maxDep;
-            }
-
-            // Draw Depletion Regions
-            ctx.fillStyle = 'rgba(189, 195, 199, 0.8)';
-            
-            // Left Depletion
-            ctx.beginPath();
-            ctx.moveTo(x, y + 40);
-            ctx.lineTo(x + depDrain, y + 40);
-            ctx.lineTo(x + depSource, y + 180);
-            ctx.lineTo(x, y + 180);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.strokeStyle = '#7f8c8d';
-            ctx.setLineDash([4, 4]);
-            ctx.stroke();
-
-            // Right Depletion
-            ctx.beginPath();
-            ctx.moveTo(x + w, y + 40);
-            ctx.lineTo(x + w - depDrain, y + 40);
-            ctx.lineTo(x + w - depSource, y + 180);
-            ctx.lineTo(x + w, y + 180);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.setLineDash([]); 
-            
-            // Physics Logic Fix: Distinguish Cut-off vs Saturation
-            if (vgs <= Vp) {
-                // Cut-off: Full channel pinched off, no current
-                ctx.fillStyle = '#e74c3c';
-                ctx.font = 'bold 13px Segoe UI';
-                ctx.fillText('Cut-off (No Current)', x + w/2, y + 115);
-            } else {
-                if (depDrain >= maxDep - 0.5) {
-                    // Saturation: Pinched at drain, but current flows max
-                    ctx.fillStyle = '#e67e22';
-                    ctx.font = 'bold 12px Segoe UI';
-                    ctx.fillText('Saturation (Pinched-off)', x + w/2, y + 115);
-                }
-                
-                if (vds > 0) {
-                    // Electrons drift in both Ohmic and Saturation regions
-                    ctx.fillStyle = 'rgba(52, 152, 219, 0.6)';
-                    ctx.font = '16px Arial';
-                    ctx.fillText('↑ e-', x + w/2, y + 160);
-                    ctx.fillText('↑ e-', x + w/2, y + 75);
-                }
-            }
+        if (vgs <= Vp) {
+            depSource = maxDep;
+            depDrain = maxDep;
         }
 
-        function calcId(vgs, vds) {
-            if (vgs <= Vp) return 0; 
-            
-            const vdsSat = vgs - Vp;
-            if (vds < vdsSat) {
-                return (2 * Idss / Math.pow(Vp, 2)) * ((vgs - Vp)*vds - (Math.pow(vds, 2) / 2));
-            } else {
-                return Idss * Math.pow(1 - (vgs / Vp), 2);
+        // Draw Depletion Regions
+        jfetCtx.fillStyle = 'rgba(189, 195, 199, 0.8)';
+        
+        jfetCtx.beginPath();
+        jfetCtx.moveTo(x, y + 40);
+        jfetCtx.lineTo(x + depDrain, y + 40);
+        jfetCtx.lineTo(x + depSource, y + 180);
+        jfetCtx.lineTo(x, y + 180);
+        jfetCtx.closePath();
+        jfetCtx.fill();
+        
+        jfetCtx.strokeStyle = '#7f8c8d';
+        jfetCtx.setLineDash([4, 4]);
+        jfetCtx.stroke();
+
+        jfetCtx.beginPath();
+        jfetCtx.moveTo(x + w, y + 40);
+        jfetCtx.lineTo(x + w - depDrain, y + 40);
+        jfetCtx.lineTo(x + w - depSource, y + 180);
+        jfetCtx.lineTo(x + w, y + 180);
+        jfetCtx.closePath();
+        jfetCtx.fill();
+        jfetCtx.stroke();
+        jfetCtx.setLineDash([]); 
+        
+        if (vgs <= Vp) {
+            jfetCtx.fillStyle = '#e74c3c';
+            jfetCtx.font = 'bold 13px Segoe UI';
+            jfetCtx.fillText('Cut-off (No Current)', x + w/2, y + 115);
+        } else {
+            if (depDrain >= maxDep - 0.5) {
+                jfetCtx.fillStyle = '#e67e22';
+                jfetCtx.font = 'bold 12px Segoe UI';
+                jfetCtx.fillText('Saturation (Pinched-off)', x + w/2, y + 115);
+            }
+            if (vds > 0) {
+                jfetCtx.fillStyle = 'rgba(52, 152, 219, 0.6)';
+                jfetCtx.font = '16px Arial';
+                jfetCtx.fillText('↑ e-', x + w/2, y + 160);
+                jfetCtx.fillText('↑ e-', x + w/2, y + 75);
             }
         }
+    }
 
-        function updateChart() {
-            const vgs = parseFloat(vgsInput.value);
-            const currentVds = parseFloat(vdsInput.value);
-            
-            const dataPoints = [];
-            for (let v = 0; v <= 15; v += 0.2) {
-                dataPoints.push({x: v, y: calcId(vgs, v)});
-            }
+    function calcId(vgs, vds) {
+        if (vgs <= Vp) return 0; 
+        const vdsSat = vgs - Vp;
+        if (vds < vdsSat) {
+            return (2 * Idss / Math.pow(Vp, 2)) * ((vgs - Vp)*vds - (Math.pow(vds, 2) / 2));
+        } else {
+            return Idss * Math.pow(1 - (vgs / Vp), 2);
+        }
+    }
 
-            const currentId = calcId(vgs, currentVds);
+    // Native HTML5 Canvas Chart (Replaces Chart.js)
+    function drawNativeChart() {
+        const vgs = parseFloat(vgsInput.value);
+        const currentVds = parseFloat(vdsInput.value);
+        const currentId = calcId(vgs, currentVds);
 
-            if (chart) {
-                chart.data.datasets[0].data = dataPoints;
-                chart.data.datasets[1].data = [{x: currentVds, y: currentId}];
-                // Fixed Label: This is an Output Curve, not a Transfer Curve
-                chart.data.datasets[0].label = `Output Curve (VGS = ${vgs.toFixed(1)}V)`;
-                chart.update();
-            } else {
-                const ctxChart = document.getElementById('ivChart').getContext('2d');
-                chart = new Chart(ctxChart, {
-                    type: 'line',
-                    data: {
-                        datasets: [{
-                            label: `Output Curve (VGS = ${vgs.toFixed(1)}V)`,
-                            data: dataPoints,
-                            borderColor: '#2980b9',
-                            backgroundColor: 'rgba(41, 128, 185, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0
-                        }, {
-                            label: 'Operating Point',
-                            data: [{x: currentVds, y: currentId}],
-                            backgroundColor: '#e74c3c',
-                            borderColor: '#c0392b',
-                            pointRadius: 6,
-                            pointHoverRadius: 8,
-                            type: 'scatter'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Drain-Source Voltage (V)', font: {weight: 'bold'} }, min: 0, max: 15 },
-                            y: { title: { display: true, text: 'Drain Current (mA)', font: {weight: 'bold'} }, min: 0, max: 12 }
-                        },
-                        animation: { duration: 200 }
-                    }
-                });
-            }
+        chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
+        const padX = 45;
+        const padY = 40;
+        const w = chartCanvas.width - padX - 20;
+        const h = chartCanvas.height - padY - 20;
+        
+        const maxVds = 15;
+        const maxId = 12;
+
+        // Coordinate mapping functions
+        const getX = (v) => padX + (v / maxVds) * w;
+        const getY = (i) => chartCanvas.height - padY - (i / maxId) * h;
+
+        // Draw Axes
+        chartCtx.beginPath();
+        chartCtx.moveTo(padX, 20);
+        chartCtx.lineTo(padX, chartCanvas.height - padY);
+        chartCtx.lineTo(padX + w, chartCanvas.height - padY);
+        chartCtx.strokeStyle = '#2c3e50';
+        chartCtx.lineWidth = 2;
+        chartCtx.stroke();
+
+        // Axis Labels
+        chartCtx.fillStyle = '#333';
+        chartCtx.font = '12px Segoe UI';
+        chartCtx.textAlign = 'center';
+        chartCtx.fillText('Drain-Source Voltage (VDS)', padX + w/2, chartCanvas.height - 10);
+        
+        chartCtx.save();
+        chartCtx.translate(15, chartCanvas.height/2);
+        chartCtx.rotate(-Math.PI/2);
+        chartCtx.fillText('Drain Current (ID) mA', 0, 0);
+        chartCtx.restore();
+
+        // Ticks
+        chartCtx.font = '10px Segoe UI';
+        chartCtx.fillStyle = '#7f8c8d';
+        for (let i = 0; i <= maxVds; i += 3) {
+            chartCtx.fillText(i, getX(i), chartCanvas.height - padY + 15);
+        }
+        for (let i = 0; i <= maxId; i += 3) {
+            chartCtx.textAlign = 'right';
+            chartCtx.fillText(i, padX - 8, getY(i) + 4);
         }
 
-        function update() {
-            vgsVal.innerText = parseFloat(vgsInput.value).toFixed(1);
-            vdsVal.innerText = parseFloat(vdsInput.value).toFixed(1);
-            drawJFET();
-            updateChart();
+        // Draw IV Curve
+        chartCtx.beginPath();
+        for (let v = 0; v <= maxVds; v += 0.2) {
+            let id = calcId(vgs, v);
+            if (v === 0) chartCtx.moveTo(getX(v), getY(id));
+            else chartCtx.lineTo(getX(v), getY(id));
         }
+        chartCtx.strokeStyle = '#2980b9';
+        chartCtx.lineWidth = 3;
+        chartCtx.stroke();
 
-        vgsInput.addEventListener('input', update);
-        vdsInput.addEventListener('input', update);
+        // Draw Operating Point (Red Dot)
+        chartCtx.beginPath();
+        chartCtx.arc(getX(currentVds), getY(currentId), 6, 0, 2 * Math.PI);
+        chartCtx.fillStyle = '#e74c3c';
+        chartCtx.fill();
+        chartCtx.strokeStyle = 'white';
+        chartCtx.lineWidth = 2;
+        chartCtx.stroke();
+        
+        // Vds_sat marker line
+        const vdsSat = Math.max(0, vgs - Vp);
+        if (vdsSat > 0 && vdsSat < maxVds && vgs > Vp) {
+            chartCtx.beginPath();
+            chartCtx.moveTo(getX(vdsSat), getY(0));
+            chartCtx.lineTo(getX(vdsSat), getY(calcId(vgs, vdsSat)));
+            chartCtx.strokeStyle = '#bdc3c7';
+            chartCtx.setLineDash([4, 4]);
+            chartCtx.lineWidth = 1;
+            chartCtx.stroke();
+            chartCtx.setLineDash([]);
+        }
+    }
 
-        update();
-    </script>
+    function update() {
+        vgsVal.innerText = parseFloat(vgsInput.value).toFixed(1);
+        vdsVal.innerText = parseFloat(vdsInput.value).toFixed(1);
+        drawJFET();
+        drawNativeChart();
+    }
+
+    vgsInput.addEventListener('input', update);
+    vdsInput.addEventListener('input', update);
+
+    // Initial render
+    update();
+</script>
 </body>
 </html>

@@ -19,3 +19,9 @@ This interactive model visualizes the phenomenological electrodynamics of superc
 
 
 [Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/superconductors.htm)
+
+* ### **Kinematic Retardation Paradox Simulator**
+This interactive model visualizes the Liénard-Wiechert potentials for a relativistic charge moving at constant velocity. It highlights the kinematic disconnect between the particle's optical image (governed by the retarded time, $t_r = t - R/c$) and its electric field vector. By tracing photon propagation, the simulation demonstrates how retardation geometry perfectly cancels, causing the observer's $\vec{E}$ field to point exactly at the charge's present, instantaneous position rather than its emission point.
+
+
+[Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/retard.htm)

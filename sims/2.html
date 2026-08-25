@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Orbital Particle Map</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; color: #fff; font-family: monospace; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        #ui-panel {
+            position: absolute; top: 10px; left: 10px; 
+            background: rgba(10, 10, 15, 0.85); padding: 15px; 
+            border: 1px solid #333; border-radius: 8px; width: 340px;
+        }
+        h2 { margin: 0 0 10px 0; font-size: 16px; color: #00ffcc; }
+        .control-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-size: 12px; color: #aaa; }
+        select {
+            width: 100%; padding: 8px; background: #222; color: #fff; 
+            border: 1px solid #444; border-radius: 4px; cursor: pointer;
+            font-family: inherit; margin-bottom: 5px;
+        }
+        .checkbox-group {
+            display: flex; align-items: center; margin-top: 10px;
+            background: #1a1a24; padding: 8px; border-radius: 4px; border: 1px solid #333;
+        }
+        .checkbox-group input { margin-right: 8px; cursor: pointer; }
+        #info-box {
+            margin-top: 15px; background: #111; border: 1px solid #222; 
+            padding: 10px; font-size: 12px; border-radius: 4px; line-height: 1.5;
+        }
+        .highlight { color: #00ffcc; }
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20px; color: #00ffcc; display: none; pointer-events: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Atomic Orbital Simulator</h2>
+        
+        <div class="control-group">
+            <label>Aufbau Energy Order (Select Orbital)</label>
+            <select id="orbital-select"></select>
+        </div>
+
+        <div class="control-group">
+            <label>Degeneracy & Real Basis</label>
+            <select id="substate-select"></select>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="slice-check">
+            <label for="slice-check" style="margin:0; color:#fff;">View Cross-Section (Reveal Radial Nodes)</label>
+        </div>
+
+        <div id="info-box">
+            <div>Principal (n): <span id="info-n" class="highlight">-</span></div>
+            <div>Azimuthal (l): <span id="info-l" class="highlight">-</span></div>
+            <div>Radial Nodes (n-l-1): <span id="info-rnodes" class="highlight">-</span></div>
+            <div>Angular Nodes (l): <span id="info-anodes" class="highlight">-</span></div>
+        </div>
+    </div>
+
+    <div id="loading">Calculating Probability Density...</div>
+    <div id="canvas-container"></div>
+
+    <script>
+        const orbitals = [
+            { id: '1s', n: 1, l: 0 }, { id: '2s', n: 2, l: 0 }, { id: '2p', n: 2, l: 1 },
+            { id: '3s', n: 3, l: 0 }, { id: '3p', n: 3, l: 1 }, { id: '4s', n: 4, l: 0 },
+            { id: '3d', n: 3, l: 2 }, { id: '4p', n: 4, l: 1 }, { id: '5s', n: 5, l: 0 },
+            { id: '4d', n: 4, l: 2 }, { id: '5p', n: 5, l: 1 }, { id: '6s', n: 6, l: 0 },
+            { id: '4f', n: 4, l: 3 }
+        ];
+
+        // Cartesian state mappings for Real Spherical Harmonics
+        const subStates = {
+            0: [{ m: 0, label: 's' }],
+            1: [{ m: 1, label: 'px' }, { m: -1, label: 'py' }, { m: 0, label: 'pz' }],
+            2: [
+                { m: 0, label: 'dz²' }, { m: 1, label: 'dxz' }, { m: -1, label: 'dyz' },
+                { m: 2, label: 'dx²-y²' }, { m: -2, label: 'dxy' }
+            ],
+            3: [
+                { m: 0, label: 'fz³' }, { m: 1, label: 'fxz²' }, { m: -1, label: 'fyz²' },
+                { m: 2, label: 'fz(x²-y²)' }, { m: -2, label: 'fxyz' }, 
+                { m: 3, label: 'fx(x²-3y²)' }, { m: -3, label: 'fy(3x²-y²)' }
+            ]
+        };
+
+        const colors = [0x00ffff, 0xff00ff, 0xffff00, 0xff5555, 0x55ff55, 0x5555ff, 0xffaa00];
+        const particleCountPerState = 40000;
+        
+        // Three.js setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.localClippingEnabled = false; // Toggled by checkbox
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        camera.position.set(25, 15, 35);
+
+        const axesHelper = new THREE.AxesHelper(10);
+        scene.add(axesHelper);
+
+        let particleSystem = new THREE.Group();
+        scene.add(particleSystem);
+
+        const clipPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+
+        // Math Helpers for exact Radial Wavefunctions
+        function factorial(n) {
+            if (n <= 1) return 1;
+            let res = 1;
+            for(let i=2; i<=n; i++) res *= i;
+            return res;
+        }
+
+        function binomial(n, k) {
+            return factorial(n) / (factorial(k) * factorial(n - k));
+        }
+
+        // Generalized Laguerre Polynomial L_{n}^{k}(x)
+        function laguerre(n, k, x) {
+            let sum = 0;
+            for (let i = 0; i <= n; i++) {
+                let term = Math.pow(-1, i) * binomial(n + k, n - i) * Math.pow(x, i) / factorial(i);
+                sum += term;
+            }
+            return sum;
+        }
+
+        function radial(r, n, l) {
+            // Using scaled coordinate rho = 2r / n
+            let rho = (2 * r) / n;
+            let lag = laguerre(n - l - 1, 2 * l + 1, rho);
+            return Math.pow(rho, l) * lag * Math.exp(-rho / 2);
+        }
+
+        // Real Spherical Harmonics mapped to Cartesian coordinates
+        function angular(x, y, z, r, l, m) {
+            if (r === 0) return (l === 0) ? 1 : 0;
+            let x_ = x/r, y_ = y/r, z_ = z/r;
+            
+            if (l === 0) return 1;
+            if (l === 1) { 
+                if (m === 1) return x_; 
+                if (m === -1) return y_; 
+                if (m === 0) return z_; 
+            }
+            if (l === 2) { 
+                if (m === 0) return 3*z_*z_ - 1; 
+                if (m === 1) return x_*z_; 
+                if (m === -1) return y_*z_; 
+                if (m === 2) return x_*x_ - y_*y_; 
+                if (m === -2) return x_*y_; 
+            }
+            if (l === 3) { 
+                if (m === 0) return z_ * (5*z_*z_ - 3); 
+                if (m === 1) return x_ * (5*z_*z_ - 1); 
+                if (m === -1) return y_ * (5*z_*z_ - 1); 
+                if (m === 2) return z_ * (x_*x_ - y_*y_); 
+                if (m === -2) return x_*y_*z_; 
+                if (m === 3) return x_ * (x_*x_ - 3*y_*y_); 
+                if (m === -3) return y_ * (3*x_*x_ - y_*y_); 
+            }
+            return 1;
+        }
+
+        function generateParticles(n, l, m, colorHex, isSliced) {
+            // Box scale needs to grow with n^2 for higher orbitals to capture the tails
+            const boxSize = 10 + (n * n * 2); 
+            
+            // Probing max density for Rejection Sampling normalization
+            let maxDensity = 0;
+            for(let i=0; i<10000; i++) {
+                let rx = (Math.random()-0.5)*boxSize;
+                let ry = (Math.random()-0.5)*boxSize;
+                let rz = (Math.random()-0.5)*boxSize;
+                let r = Math.sqrt(rx*rx + ry*ry + rz*rz);
+                let prob = Math.pow(radial(r, n, l) * angular(rx, ry, rz, r, l, m), 2);
+                if (prob > maxDensity) maxDensity = prob;
+            }
+            maxDensity *= 1.05; 
+
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCountPerState * 3);
+            
+            let pIndex = 0;
+            let attempts = 0;
+            const maxAttempts = particleCountPerState * 1000; // Bailout
+
+            while(pIndex < particleCountPerState && attempts < maxAttempts) {
+                attempts++;
+                let rx = (Math.random()-0.5)*boxSize;
+                let ry = (Math.random()-0.5)*boxSize;
+                let rz = (Math.random()-0.5)*boxSize;
+                let r = Math.sqrt(rx*rx + ry*ry + rz*rz);
+                
+                let prob = Math.pow(radial(r, n, l) * angular(rx, ry, rz, r, l, m), 2);
+                
+                // Rejection sample with density weighting
+                if (Math.random() < (prob / maxDensity)) {
+                    positions[pIndex*3] = rx;
+                    positions[pIndex*3+1] = ry;
+                    positions[pIndex*3+2] = rz;
+                    pIndex++;
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.12,
+                color: colorHex,
+                transparent: true,
+                opacity: 0.45,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                clippingPlanes: isSliced ? [clipPlane] : [],
+                clipIntersection: false
+            });
+
+            return new THREE.Points(geometry, material);
+        }
+
+        // UI Setup
+        const orbitalSelect = document.getElementById('orbital-select');
+        const substateSelect = document.getElementById('substate-select');
+        const sliceCheck = document.getElementById('slice-check');
+
+        orbitals.forEach((o, index) => {
+            let opt = document.createElement('option');
+            opt.value = index;
+            opt.innerHTML = `Energy Level ${index + 1}: ${o.id}`;
+            orbitalSelect.appendChild(opt);
+        });
+
+        function populateSubstates(l) {
+            substateSelect.innerHTML = '';
+            
+            // "All" option
+            let optAll = document.createElement('option');
+            optAll.value = 'all';
+            optAll.innerHTML = `All Degenerate States Superimposed`;
+            substateSelect.appendChild(optAll);
+
+            // Specific options
+            subStates[l].forEach((state) => {
+                let opt = document.createElement('option');
+                opt.value = state.m;
+                opt.innerHTML = `Single Orbital: ${state.label}`;
+                substateSelect.appendChild(opt);
+            });
+        }
+
+        function updateSimulation() {
+            document.getElementById('loading').style.display = 'block';
+            
+            setTimeout(() => {
+                // Clear existing geometry
+                while(particleSystem.children.length > 0){ 
+                    let child = particleSystem.children[0];
+                    child.geometry.dispose();
+                    child.material.dispose();
+                    particleSystem.remove(child); 
+                }
+
+                const orb = orbitals[parseInt(orbitalSelect.value)];
+                const selectedM = substateSelect.value;
+                const isSliced = sliceCheck.checked;
+                renderer.localClippingEnabled = isSliced;
+
+                document.getElementById('info-n').innerText = orb.n;
+                document.getElementById('info-l').innerText = orb.l;
+                document.getElementById('info-rnodes').innerText = orb.n - orb.l - 1;
+                document.getElementById('info-anodes').innerText = orb.l;
+
+                // Adjust camera distance to fit larger orbital footprints
+                camera.position.set(orb.n*8, orb.n*5, orb.n*10);
+
+                if (selectedM === 'all') {
+                    // Render all real bases concurrently
+                    subStates[orb.l].forEach((state, i) => {
+                        let pts = generateParticles(orb.n, orb.l, state.m, colors[i % colors.length], isSliced);
+                        particleSystem.add(pts);
+                    });
+                } else {
+                    // Render specific real basis
+                    let pts = generateParticles(orb.n, orb.l, parseInt(selectedM), colors[0], isSliced);
+                    particleSystem.add(pts);
+                }
+
+                document.getElementById('loading').style.display = 'none';
+            }, 50);
+        }
+
+        // Event Listeners
+        orbitalSelect.addEventListener('change', (e) => {
+            const l = orbitals[parseInt(e.target.value)].l;
+            populateSubstates(l);
+            updateSimulation();
+        });
+
+        substateSelect.addEventListener('change', updateSimulation);
+        sliceCheck.addEventListener('change', updateSimulation);
+
+        // Init
+        populateSubstates(orbitals[0].l);
+        updateSimulation();
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            particleSystem.rotation.y += 0.001; 
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

@@ -34,4 +34,4 @@ This interactive Monte Carlo simulation visualizes the statistical mechanics of 
 
 This WebGL app visualizes 3D atomic orbitals using Three.js. It computes exact analytical wavefunctions via Generalized Laguerre polynomials and Real Spherical Harmonics, plotting probability densities with Monte Carlo sampling.
 
->> [Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/orbital.html)
+>> [Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/orbitals.html)

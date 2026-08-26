@@ -31,3 +31,6 @@ This interactive model visualizes the Liénard-Wiechert potentials for a relativ
 This interactive Monte Carlo simulation visualizes the statistical mechanics of the 2D Ising model using the Metropolis-Hastings algorithm. It demonstrates the spontaneous emergence of macroscopic order from purely local exchange interactions. By dynamically tuning the reduced temperature ($T/T_c$) and external magnetic field ($H$), the model explicitly visualizes critical opalescence, diverging correlation lengths, and spontaneous symmetry breaking as the lattice undergoes a continuous phase transition from paramagnetic noise into a ferromagnetic domain.
 
 > [Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/ising.htm)
+
+
+>> [Viewhere](https://noisyboy.github.io/quantum-mechanics/sims/orbital.html)
